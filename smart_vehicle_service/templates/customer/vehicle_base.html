@@ -11,6 +11,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/vehicle.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/booking.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/service_history.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/health.css') }}">
 </head>
 <body class="customer-dashboard vehicle-page">
     <div class="dashboard-app">
@@ -26,9 +28,9 @@
                 <a class="sidebar-link {% if active_page == 'vehicles' %}active{% endif %}" href="{{ url_for('customer.customer_vehicles') }}"><span class="nav-icon" aria-hidden="true">&#9638;</span>My Vehicles</a>
                 <a class="sidebar-link {% if active_page == 'book-service' %}active{% endif %}" href="{{ url_for('customer.book_service') }}"><span class="nav-icon" aria-hidden="true">+</span>Book Service</a>
                 <a class="sidebar-link" href="{{ url_for('customer.customer_bookings') }}"><span class="nav-icon" aria-hidden="true">&#9776;</span>My Bookings</a>
-                <a class="sidebar-link" href="{{ url_for('customer.customer_dashboard') }}#service-history"><span class="nav-icon" aria-hidden="true">&#8635;</span>Service History</a>
+                <a class="sidebar-link {% if active_page == 'service-history' %}active{% endif %}" href="{{ url_for('customer.customer_service_history') }}"><span class="nav-icon" aria-hidden="true">&#8635;</span>Service History</a>
                 <a class="sidebar-link" href="{{ url_for('customer.customer_dashboard') }}#vehicle-health"><span class="nav-icon" aria-hidden="true">&#9829;</span>Vehicle Health</a>
-                <a class="sidebar-link" href="{{ url_for('customer.customer_dashboard') }}#notifications"><span class="nav-icon" aria-hidden="true">&#9678;</span>Reminders</a>
+                <a class="sidebar-link {% if active_page == 'notifications' %}active{% endif %}" href="{{ url_for('customer.customer_notifications') }}"><span class="nav-icon" aria-hidden="true">&#9678;</span>Notifications{% if unread_notification_count %}<b class="sidebar-count">{{ unread_notification_count }}</b>{% endif %}</a>
                 <a class="sidebar-link" href="{{ url_for('customer.customer_dashboard') }}#invoices"><span class="nav-icon" aria-hidden="true">&#9636;</span>Invoices</a>
                 <a class="sidebar-link" href="{{ url_for('customer.customer_dashboard') }}#profile"><span class="nav-icon" aria-hidden="true">&#9673;</span>Profile</a>
             </nav>

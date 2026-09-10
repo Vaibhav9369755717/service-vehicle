@@ -27,6 +27,7 @@ class User(UserMixin, TimestampMixin, db.Model):
     email = db.Column(db.String(255), nullable=False, unique=True, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     phone = db.Column(db.String(30), nullable=True)
+    specialization = db.Column(db.String(120), nullable=True)
     role = db.Column(db.String(30), nullable=False, default="customer")
 
     vehicles = db.relationship(
@@ -137,6 +138,12 @@ class ServiceRecord(TimestampMixin, db.Model):
     vehicle_id = db.Column(
         db.Integer, db.ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False
     )
+    customer_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+    )
+    invoice_id = db.Column(
+        db.Integer, db.ForeignKey("invoices.id", ondelete="SET NULL"), nullable=True
+    )
     mechanic_id = db.Column(
         db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -145,9 +152,14 @@ class ServiceRecord(TimestampMixin, db.Model):
     work_performed = db.Column(db.Text, nullable=False)
     mileage = db.Column(db.Integer, nullable=True)
     notes = db.Column(db.Text, nullable=True)
+    labor_charges = db.Column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    additional_charges = db.Column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    total_cost = db.Column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
 
     booking = db.relationship("ServiceBooking", back_populates="service_records")
     vehicle = db.relationship("Vehicle", back_populates="service_records")
+    customer = db.relationship("User", foreign_keys=[customer_id])
+    invoice = db.relationship("Invoice", foreign_keys=[invoice_id])
     mechanic = db.relationship("User", foreign_keys=[mechanic_id])
     part_usages = db.relationship(
         "PartUsage", back_populates="service_record", cascade="all, delete-orphan"
@@ -169,6 +181,7 @@ class Inspection(TimestampMixin, db.Model):
     )
     overall_status = db.Column(db.String(30), nullable=False, default="pending")
     notes = db.Column(db.Text, nullable=True)
+    recommendations = db.Column(db.Text, nullable=True)
     inspected_at = db.Column(db.DateTime, nullable=True)
 
     booking = db.relationship("ServiceBooking", back_populates="inspections")
@@ -300,13 +313,21 @@ class Part(TimestampMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     part_number = db.Column(db.String(80), nullable=False, unique=True, index=True)
+    category = db.Column(db.String(80), nullable=True, index=True)
+    supplier = db.Column(db.String(120), nullable=True)
     description = db.Column(db.Text, nullable=True)
     quantity_in_stock = db.Column(db.Integer, nullable=False, default=0)
+    minimum_stock = db.Column(db.Integer, nullable=False, default=0)
+    purchase_price = db.Column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    selling_price = db.Column(Numeric(12, 2), nullable=True)
     unit_price = db.Column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     reorder_level = db.Column(db.Integer, nullable=False, default=0)
 
     __table_args__ = (
         CheckConstraint("quantity_in_stock >= 0", name="check_part_stock_nonnegative"),
+        CheckConstraint("minimum_stock >= 0", name="check_part_minimum_stock_nonnegative"),
+        CheckConstraint("purchase_price >= 0", name="check_part_purchase_price_nonnegative"),
+        CheckConstraint("selling_price IS NULL OR selling_price >= 0", name="check_part_selling_price_nonnegative"),
         CheckConstraint("reorder_level >= 0", name="check_part_reorder_nonnegative"),
     )
 
@@ -340,6 +361,12 @@ class Notification(db.Model):
     user_id = db.Column(
         db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
+    booking_id = db.Column(
+        db.Integer, db.ForeignKey("service_bookings.id", ondelete="CASCADE"), nullable=True
+    )
+    invoice_id = db.Column(
+        db.Integer, db.ForeignKey("invoices.id", ondelete="CASCADE"), nullable=True
+    )
     title = db.Column(db.String(150), nullable=False)
     message = db.Column(db.Text, nullable=False)
     notification_type = db.Column(db.String(40), nullable=False, default="info")
@@ -348,3 +375,5 @@ class Notification(db.Model):
     read_at = db.Column(db.DateTime, nullable=True)
 
     user = db.relationship("User", back_populates="notifications")
+    booking = db.relationship("ServiceBooking")
+    invoice = db.relationship("Invoice")

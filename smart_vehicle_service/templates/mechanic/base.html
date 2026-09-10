@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title }} | Smart Vehicle Service</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mechanic.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mechanic_parts.css') }}">
+</head>
+<body class="mechanic-page">
+    <div class="mechanic-app">
+        <div class="mechanic-backdrop" data-mechanic-close></div>
+        <aside class="mechanic-sidebar" id="mechanic-sidebar">
+            <div class="mechanic-brand-row"><a class="brand" href="{{ url_for('home') }}"><span class="brand-mark" aria-hidden="true">SV</span><span class="brand-name">Smart<span>Vehicle</span></span></a><button class="mechanic-close" type="button" data-mechanic-close aria-label="Close navigation">&times;</button></div>
+            <p class="mechanic-label">Workshop</p>
+            <nav class="mechanic-nav" aria-label="Mechanic navigation">
+                <a class="mechanic-nav-link {% if active_page == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard.mechanic_dashboard') }}"><span aria-hidden="true">&#9632;</span>Dashboard</a>
+                <a class="mechanic-nav-link {% if active_page == 'jobs' %}active{% endif %}" href="{{ url_for('dashboard.mechanic_jobs') }}"><span aria-hidden="true">&#9776;</span>My Jobs</a>
+                <a class="mechanic-nav-link {% if active_page == 'inspections' %}active{% endif %}" href="{{ url_for('dashboard.mechanic_inspections') }}"><span aria-hidden="true">&#9638;</span>Inspections</a>
+                <a class="mechanic-nav-link" href="{{ url_for('dashboard.mechanic_dashboard') }}#performance"><span aria-hidden="true">&#10003;</span>Performance</a>
+                <a class="mechanic-nav-link" href="{{ url_for('dashboard.mechanic_dashboard') }}#notifications"><span aria-hidden="true">&#9678;</span>Notifications</a>
+            </nav>
+            <div class="mechanic-sidebar-footer"><form method="post" action="{{ url_for('auth.logout') }}"><button class="mechanic-nav-link" type="submit"><span aria-hidden="true">&#8594;</span>Log out</button></form></div>
+        </aside>
+        <div class="mechanic-content">
+            <header class="mechanic-topbar"><button class="mechanic-toggle" type="button" data-mechanic-toggle aria-label="Open navigation" aria-expanded="false"><span></span><span></span><span></span></button><div><span class="mechanic-kicker">Workshop workspace</span><h1>{{ page_title }}</h1></div><div class="mechanic-user"><span class="mechanic-avatar">{{ current_user.name[:1]|upper }}</span><span>{{ current_user.name }}</span></div></header>
+            <main class="mechanic-main">{% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<div class="mechanic-flashes">{% for category, message in messages %}<div class="flash flash-{{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}{% block content %}{% endblock %}</main>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/mechanic.js') }}"></script>
+</body>
+</html>

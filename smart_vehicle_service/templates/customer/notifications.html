@@ -1,0 +1,47 @@
+{% extends "customer/vehicle_base.html" %}
+{% set active_page = "notifications" %}
+{% block content %}
+<section class="notifications-page">
+    <div class="notifications-toolbar">
+        <div>
+            <p class="eyebrow">Stay informed</p>
+            <h2>Your notifications</h2>
+            <p>Updates about your bookings, service progress and payments.</p>
+        </div>
+        {% if unread_notification_count %}
+        <form method="post" action="{{ url_for('customer.mark_all_notifications_read') }}">
+            <button class="button button-secondary" type="submit">Mark all as read</button>
+        </form>
+        {% endif %}
+    </div>
+    {% if notifications %}
+    <div class="notification-feed">
+        {% for notification in notifications %}
+        <div class="notification-row {% if not notification.is_read %}unread{% endif %}">
+            <span class="notification-dot" aria-hidden="true"></span>
+            <a class="notification-content notification-link" href="{{ url_for('customer.notification_details', notification_id=notification.id) }}">
+                <strong>{{ notification.title }}</strong>
+                <p>{{ notification.message }}</p>
+                <small>{{ notification.created_at.strftime('%d %b %Y at %H:%M') }}{% if notification.notification_type %} &middot; {{ notification.notification_type|replace('_', ' ')|title }}{% endif %}</small>
+            </a>
+            <div class="notification-actions">
+                {% if notification.is_read %}
+                    <span class="notification-read-state">Read</span>
+                {% else %}
+                    <form method="post" action="{{ url_for('customer.mark_notification_read', notification_id=notification.id) }}">
+                        <button class="notification-read-button" type="submit">Mark as read</button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="notification-feed empty-state">
+        <span class="empty-icon" aria-hidden="true">&#9678;</span>
+        <strong>You're all caught up.</strong>
+        <p>New booking and service updates will appear here.</p>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

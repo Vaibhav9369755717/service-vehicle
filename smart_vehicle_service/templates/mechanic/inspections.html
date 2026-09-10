@@ -1,0 +1,6 @@
+{% extends "mechanic/base.html" %}
+{% set active_page = "inspections" %}
+{% block content %}
+<section class="mechanic-page-heading"><div><p class="eyebrow">Quality checks</p><h2>Vehicle inspections</h2><p>Review inspection results for vehicles in your assigned jobs.</p></div></section>
+{% if inspections %}<section class="mechanic-card inspection-page-list">{% for inspection in inspections %}<a class="inspection-page-row" href="{{ url_for('dashboard.mechanic_job_detail', booking_id=inspection.booking_id) }}"><div><strong>{{ inspection.vehicle.manufacturer }} {{ inspection.vehicle.model }}</strong><span>{{ inspection.vehicle.registration_number }} &middot; {{ inspection.booking.service_type }}</span></div><div>{% for item in inspection.items[:3] %}<small>{{ item.item_name }}: {{ item.status|replace('_', ' ')|title }}</small>{% endfor %}</div><span class="status-badge status-{{ inspection.overall_status|lower|replace(' ', '-') }}">{{ inspection.overall_status|replace('_', ' ')|title }}</span></a>{% endfor %}</section>{% else %}<section class="mechanic-empty mechanic-empty-large"><strong>No inspections assigned.</strong><p>Inspection tasks linked to your jobs will appear here.</p></section>{% endif %}
+{% endblock %}

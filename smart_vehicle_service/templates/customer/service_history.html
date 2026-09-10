@@ -1,0 +1,63 @@
+{% extends "customer/vehicle_base.html" %}
+{% set active_page = "service-history" %}
+{% block content %}
+<section class="vehicle-page-heading">
+    <div>
+        <p class="eyebrow">Maintenance timeline</p>
+        <h2>Service history</h2>
+        <p>Review completed work, parts and costs for your vehicles.</p>
+    </div>
+    <span class="history-total">{{ records|length }} {{ "service" if records|length == 1 else "services" }}</span>
+</section>
+
+<form class="history-filters" method="get" action="{{ url_for('customer.customer_service_history') }}">
+    <div class="history-search field">
+        <label for="history-search">Search</label>
+        <input id="history-search" name="q" type="search" value="{{ filters.q }}" placeholder="Search service or work performed">
+    </div>
+    <div class="field">
+        <label for="history-vehicle">Vehicle</label>
+        <select id="history-vehicle" name="vehicle_id">
+            <option value="">All vehicles</option>
+            {% for vehicle in vehicles %}<option value="{{ vehicle.id }}" {% if filters.vehicle_id == vehicle.id %}selected{% endif %}>{{ vehicle.manufacturer }} {{ vehicle.model }} &middot; {{ vehicle.registration_number }}</option>{% endfor %}
+        </select>
+    </div>
+    <div class="field">
+        <label for="history-service-type">Service type</label>
+        <select id="history-service-type" name="service_type">
+            <option value="">All service types</option>
+            {% for service_type in service_types %}<option value="{{ service_type }}" {% if filters.service_type == service_type %}selected{% endif %}>{{ service_type }}</option>{% endfor %}
+        </select>
+    </div>
+    <div class="field"><label for="history-date-from">From</label><input id="history-date-from" name="date_from" type="date" value="{{ filters.date_from }}"></div>
+    <div class="field"><label for="history-date-to">To</label><input id="history-date-to" name="date_to" type="date" value="{{ filters.date_to }}"></div>
+    <button class="button button-primary" type="submit">Filter</button>
+    {% if filters.q or filters.vehicle_id or filters.service_type or filters.date_from or filters.date_to %}<a class="text-link history-clear" href="{{ url_for('customer.customer_service_history') }}">Clear</a>{% endif %}
+</form>
+
+{% if records %}
+<section class="history-table-card">
+    <div class="history-table-head"><span>Service</span><span>Vehicle</span><span>Service date</span><span>Mechanic</span><span>Work performed</span><span>Parts used</span><span>Total cost</span><span>Status</span><span></span></div>
+    {% for record in records %}
+    <a class="history-table-row" href="{{ url_for('customer.service_history_detail', record_id=record.id) }}">
+        <span class="history-service-id"><strong>#{{ "%04d"|format(record.id) }}</strong><small>{{ record.booking.service_type }}</small></span>
+        <span><strong>{{ record.vehicle.manufacturer }} {{ record.vehicle.model }}</strong><small>{{ record.vehicle.registration_number }}</small></span>
+        <span>{{ record.service_date.strftime('%d %b %Y') }}</span>
+        <span>{{ record.mechanic.name if record.mechanic else "Not assigned" }}</span>
+        <span class="history-work">{{ record.work_performed }}</span>
+        <span>{{ record.part_usages|length }}</span>
+        <span class="history-cost">{{ "%.2f"|format(service_costs[record.id]|float) }}</span>
+        <span class="status-badge status-completed">{{ record.booking.status|replace('_', ' ')|title }}</span>
+        <span class="row-arrow" aria-hidden="true">&#8594;</span>
+    </a>
+    {% endfor %}
+</section>
+{% else %}
+<section class="vehicle-empty-state">
+    <span class="vehicle-empty-icon" aria-hidden="true">&#8635;</span>
+    <h3>No completed services found.</h3>
+    <p>Completed mechanic work for your vehicles will appear here.</p>
+    {% if filters.q or filters.vehicle_id or filters.service_type or filters.date_from or filters.date_to %}<a class="button button-secondary" href="{{ url_for('customer.customer_service_history') }}">Clear filters</a>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

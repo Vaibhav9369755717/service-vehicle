@@ -147,6 +147,7 @@ def add_dashboard_data(app):
                 ),
                 Notification(
                     user=customer,
+                    booking=own_upcoming,
                     title="Service reminder",
                     message="Your scheduled maintenance is coming up.",
                     created_at=datetime.utcnow(),
@@ -216,3 +217,56 @@ def test_non_customer_role_is_forbidden_from_customer_dashboard(client, app):
 
     assert response.status_code == 302
     assert client.get("/customer/dashboard").status_code == 403
+
+
+def test_customer_can_view_and_manage_owned_notifications(client, app):
+    add_dashboard_data(app)
+    login_customer(client)
+
+    response = client.get("/customer/notifications")
+
+    assert response.status_code == 200
+    assert b"Service reminder" in response.data
+    assert b"Mark as read" in response.data
+    assert b"Private reminder" not in response.data
+
+    with app.app_context():
+        notification = Notification.query.filter_by(
+            title="Service reminder"
+        ).one()
+        notification_id = notification.id
+        booking_id = notification.booking_id
+
+    response = client.get(f"/customer/notifications/{notification_id}")
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith(
+        f"/customer/bookings/{booking_id}"
+    )
+
+    response = client.post(f"/customer/notifications/{notification_id}/read")
+
+    assert response.status_code == 302
+    with app.app_context():
+        notification = db.session.get(Notification, notification_id)
+        assert notification.is_read is True
+        assert notification.read_at is not None
+
+
+def test_customer_can_mark_all_notifications_read_and_cannot_access_other_users(client, app):
+    add_dashboard_data(app)
+    login_customer(client)
+
+    with app.app_context():
+        other_notification = Notification.query.filter_by(
+            title="Private reminder"
+        ).one()
+        other_notification_id = other_notification.id
+
+    assert client.post("/customer/notifications/read-all").status_code == 302
+    with app.app_context():
+        assert Notification.query.filter_by(is_read=False).count() == 1
+
+    response = client.post(f"/customer/notifications/{other_notification_id}/read")
+
+    assert response.status_code == 404

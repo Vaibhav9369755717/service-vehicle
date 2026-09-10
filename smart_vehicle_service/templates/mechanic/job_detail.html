@@ -1,0 +1,33 @@
+{% extends "mechanic/base.html" %}
+{% set active_page = "jobs" %}
+{% block content %}
+<section class="mechanic-detail-heading">
+    <div><a class="back-link" href="{{ url_for('dashboard.mechanic_jobs') }}">&larr; Assigned jobs</a><p class="eyebrow">Job #{{ "%04d"|format(job.id) }}</p><h2>{{ job.service_type }}</h2><p>{{ job.vehicle.manufacturer }} {{ job.vehicle.model }} &middot; {{ job.vehicle.registration_number }}</p></div>
+    <span class="status-badge status-{{ job.status|lower|replace(' ', '-') }} mechanic-detail-status">{{ job.status|replace('_', ' ')|title }}</span>
+</section>
+<section class="mechanic-detail-grid">
+    <article class="mechanic-card"><div class="mechanic-card-heading"><div><p class="card-kicker">Service request</p><h3>Job details</h3></div><a class="card-link" href="{{ url_for('dashboard.mechanic_job_inspection', booking_id=job.id) }}">{% if inspection %}Update inspection{% else %}Start inspection{% endif %} <span aria-hidden="true">&#8599;</span></a></div><dl class="mechanic-info-list"><div><dt>Customer</dt><dd>{{ job.customer.name }}</dd></div><div><dt>Vehicle</dt><dd>{{ job.vehicle.manufacturer }} {{ job.vehicle.model }}</dd></div><div><dt>Registration</dt><dd>{{ job.vehicle.registration_number }}</dd></div><div><dt>Appointment</dt><dd>{{ job.booking_date.strftime('%d %B %Y') }} at {{ job.booking_time.strftime('%H:%M') }}</dd></div><div><dt>Complaint</dt><dd>{{ job.complaint or "No complaint provided" }}</dd></div><div><dt>Notes</dt><dd>{{ job.notes or "No additional notes" }}</dd></div></dl></article>
+    <article class="mechanic-card mechanic-actions-card"><div class="mechanic-card-heading"><div><p class="card-kicker">Workflow</p><h3>Update job</h3></div></div>
+        {% if job.status|lower in ['requested', 'pending', 'confirmed', 'assigned'] %}
+        <form method="post" action="{{ url_for('dashboard.accept_mechanic_job', booking_id=job.id) }}"><button class="button button-primary" type="submit">Accept job <span aria-hidden="true">&#8594;</span></button></form>
+        {% elif job.status|lower|replace('_', ' ') == 'accepted' %}
+        <form method="post" action="{{ url_for('dashboard.start_mechanic_job', booking_id=job.id) }}"><button class="button button-primary" type="submit">Start service <span aria-hidden="true">&#8594;</span></button></form>
+        {% elif job.status|lower|replace('_', ' ') in ['in progress', 'work in progress'] %}
+        <form class="complete-job-form" method="post" action="{{ url_for('dashboard.complete_mechanic_job', booking_id=job.id) }}">
+            <label for="work_performed">Work performed</label><textarea id="work_performed" name="work_performed" rows="4" required></textarea>
+            <label for="diagnosis">Diagnosis</label><textarea id="diagnosis" name="diagnosis" rows="2"></textarea>
+            <label for="mileage">Vehicle mileage</label><input id="mileage" name="mileage" type="number" min="0" value="{{ job.vehicle.mileage }}">
+            <label for="labor_charges">Labour charges</label><input id="labor_charges" name="labor_charges" type="number" min="0" step="0.01" value="0.00">
+            <label for="additional_charges">Additional charges</label><input id="additional_charges" name="additional_charges" type="number" min="0" step="0.01" value="0.00">
+            <fieldset class="mechanic-parts-fieldset"><legend>Parts used</legend>{% for row in range(3) %}<div class="mechanic-part-input"><select name="part_id" aria-label="Part {{ row + 1 }}"><option value="">No part</option>{% for part in available_parts %}<option value="{{ part.id }}">{{ part.name }} ({{ part.quantity_in_stock }} in stock)</option>{% endfor %}</select><input name="quantity" type="number" min="1" step="1" value="" placeholder="Qty" aria-label="Quantity for part {{ row + 1 }}"></div>{% endfor %}</fieldset>
+            <label for="notes">Mechanic notes</label><textarea id="notes" name="notes" rows="3"></textarea>
+            <button class="button button-primary" type="submit">Complete service <span aria-hidden="true">&#10003;</span></button>
+        </form>
+        {% elif job.status|lower in ['completed', 'closed'] %}
+        <div class="mechanic-complete-state"><strong>Service completed</strong><p>This job has been completed and is now part of the customer&apos;s service history.</p><a class="card-link" href="{{ url_for('dashboard.edit_mechanic_service_record', booking_id=job.id) }}">Edit service record <span aria-hidden="true">&#8599;</span></a></div>
+        {% else %}<p class="mechanic-muted">No workflow action is available for this status.</p>{% endif %}
+    </article>
+</section>
+{% if inspection %}<section class="mechanic-card"><div class="mechanic-card-heading"><div><p class="card-kicker">Quality check</p><h3>Inspection results</h3></div><span class="status-badge status-{{ inspection.overall_status|lower|replace(' ', '-') }}">{{ inspection.overall_status|title }}</span></div><div class="mechanic-inspection-items">{% for item in inspection.items %}<div><strong>{{ item.item_name }}</strong><span>{{ item.status|replace('_', ' ')|title }}</span>{% if item.notes %}<small>{{ item.notes }}</small>{% endif %}</div>{% endfor %}</div>{% if inspection.notes %}<p class="mechanic-notes">{{ inspection.notes }}</p>{% endif %}</section>{% endif %}
+{% if service_record and service_record.part_usages %}<section class="mechanic-card"><div class="mechanic-card-heading"><div><p class="card-kicker">Completed work</p><h3>Parts used</h3></div></div><div class="mechanic-part-list">{% for usage in service_record.part_usages %}<div><strong>{{ usage.part.name }}</strong><span>{{ usage.quantity|float|round(0, 'common')|int }} &times; {{ "%.2f"|format(usage.unit_cost|float) }}</span></div>{% endfor %}</div></section>{% endif %}
+{% endblock %}

@@ -1,0 +1,6 @@
+{% extends "mechanic/base.html" %}
+{% set active_page = "jobs" %}
+{% block content %}
+<section class="mechanic-page-heading"><div><p class="eyebrow">Workshop queue</p><h2>Assigned jobs</h2><p>Every job in this queue is assigned to your workshop account.</p></div></section>
+{% if jobs %}<section class="mechanic-job-table"><div class="mechanic-job-table-head"><span>Job</span><span>Vehicle</span><span>Customer</span><span>Date &amp; time</span><span>Status</span><span></span></div>{% for job in jobs %}<a class="mechanic-job-table-row" href="{{ url_for('dashboard.mechanic_job_detail', booking_id=job.id) }}"><span><strong>#{{ "%04d"|format(job.id) }}</strong><small>{{ job.service_type }}</small></span><span><strong>{{ job.vehicle.manufacturer }} {{ job.vehicle.model }}</strong><small>{{ job.vehicle.registration_number }}</small></span><span>{{ job.customer.name }}</span><span>{{ job.booking_date.strftime('%d %b %Y') }}<small>{{ job.booking_time.strftime('%H:%M') }}</small></span><span class="status-badge status-{{ job.status|lower|replace(' ', '-') }}">{{ job.status|replace('_', ' ')|title }}</span><span class="row-arrow" aria-hidden="true">&#8594;</span></a>{% endfor %}</section>{% else %}<section class="mechanic-empty mechanic-empty-large"><strong>No assigned jobs.</strong><p>New work assigned to you will appear here.</p></section>{% endif %}
+{% endblock %}
