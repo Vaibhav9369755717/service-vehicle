@@ -1,4 +1,5 @@
 from datetime import date, time, timedelta
+from decimal import Decimal
 
 import pytest
 from werkzeug.security import generate_password_hash
@@ -191,6 +192,57 @@ def test_mechanic_can_accept_start_and_complete_assigned_job(client, app):
     assert b"Replaced brake pads and tested system" in admin_records.data
 
 
+def test_service_completion_generates_taxed_invoice_and_allows_invoice_views(client, app):
+    login(client, "assigned-mechanic@example.com", "mechanic-pass")
+    assigned_id = job_id(app, "Brake Service")
+    with app.app_context():
+        part_id = Part.query.filter_by(part_number="MECH-PAD-001").one().id
+
+    client.post(f"/mechanic/jobs/{assigned_id}/accept")
+    client.post(f"/mechanic/jobs/{assigned_id}/start")
+    response = client.post(
+        f"/mechanic/jobs/{assigned_id}/complete",
+        data={
+            "work_performed": "Replaced brake pads and tested system",
+            "diagnosis": "Pads worn",
+            "mileage": "22500",
+            "labor_charges": "50.00",
+            "additional_charges": "10.00",
+            "part_id": str(part_id),
+            "quantity": "2",
+        },
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        invoice = Invoice.query.filter_by(booking_id=assigned_id).one()
+        assert invoice.subtotal == Decimal("210.00")
+        assert invoice.tax == Decimal("21.00")
+        assert invoice.total == Decimal("231.00")
+        assert invoice.status == "unpaid"
+
+    client.post("/auth/logout")
+    login(client, "workshop-customer@example.com", "customer-pass")
+    invoices_response = client.get("/customer/invoices")
+    detail_response = client.get(f"/customer/invoices/{invoice.id}")
+    assert invoices_response.status_code == 200
+    assert b"231.00" in invoices_response.data
+    assert detail_response.status_code == 200
+    assert b"Tax / GST" in detail_response.data
+
+    client.post("/auth/logout")
+    login(client, "workshop-admin@example.com", "admin-pass")
+    admin_list = client.get("/admin/invoices")
+    admin_update = client.post(
+        f"/admin/invoices/{invoice.id}/status",
+        data={"status": "paid"},
+    )
+    assert admin_list.status_code == 200
+    assert admin_update.status_code == 302
+    with app.app_context():
+        assert db.session.get(Invoice, invoice.id).status == "paid"
+
+
 def test_mechanic_cannot_open_or_update_another_mechanics_job(client, app):
     login(client, "assigned-mechanic@example.com", "mechanic-pass")
     other_id = job_id(app, "Oil Change")
@@ -314,6 +366,10 @@ def test_mechanic_can_save_update_and_customer_can_view_inspection(client, app):
         f"/mechanic/jobs/{assigned_id}/complete",
         data={"work_performed": "Completed brake inspection and repair"},
     )
+    with app.app_context():
+        record = ServiceRecord.query.filter_by(booking_id=assigned_id).one()
+        assert record.service_type == "Brake Service"
+        assert "Brake wear recorded" in (record.inspection_results or "")
     client.post("/auth/logout")
     login(client, "workshop-customer@example.com", "customer-pass")
     customer_vehicle_id = vehicle_id(app, "MECH-001")

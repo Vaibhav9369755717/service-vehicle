@@ -46,6 +46,22 @@ class User(UserMixin, TimestampMixin, db.Model):
     notifications = db.relationship(
         "Notification", back_populates="user", cascade="all, delete-orphan"
     )
+    customer_invoices = db.relationship(
+        "Invoice",
+        foreign_keys="Invoice.customer_id",
+        back_populates="customer",
+        cascade="all, delete-orphan",
+    )
+    customer_service_records = db.relationship(
+        "ServiceRecord",
+        foreign_keys="ServiceRecord.customer_id",
+        back_populates="customer",
+    )
+    mechanic_service_records = db.relationship(
+        "ServiceRecord",
+        foreign_keys="ServiceRecord.mechanic_id",
+        back_populates="mechanic",
+    )
 
 
 class Vehicle(TimestampMixin, db.Model):
@@ -147,8 +163,10 @@ class ServiceRecord(TimestampMixin, db.Model):
     mechanic_id = db.Column(
         db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    service_type = db.Column(db.String(100), nullable=False, default="General Service")
     service_date = db.Column(db.Date, nullable=False, default=date.today)
     diagnosis = db.Column(db.Text, nullable=True)
+    inspection_results = db.Column(db.Text, nullable=True)
     work_performed = db.Column(db.Text, nullable=False)
     mileage = db.Column(db.Integer, nullable=True)
     notes = db.Column(db.Text, nullable=True)
@@ -158,9 +176,9 @@ class ServiceRecord(TimestampMixin, db.Model):
 
     booking = db.relationship("ServiceBooking", back_populates="service_records")
     vehicle = db.relationship("Vehicle", back_populates="service_records")
-    customer = db.relationship("User", foreign_keys=[customer_id])
-    invoice = db.relationship("Invoice", foreign_keys=[invoice_id])
-    mechanic = db.relationship("User", foreign_keys=[mechanic_id])
+    customer = db.relationship("User", foreign_keys=[customer_id], back_populates="customer_service_records")
+    invoice = db.relationship("Invoice", foreign_keys=[invoice_id], back_populates="service_records")
+    mechanic = db.relationship("User", foreign_keys=[mechanic_id], back_populates="mechanic_service_records")
     part_usages = db.relationship(
         "PartUsage", back_populates="service_record", cascade="all, delete-orphan"
     )
@@ -274,6 +292,7 @@ class Invoice(TimestampMixin, db.Model):
     invoice_number = db.Column(db.String(40), nullable=False, unique=True, index=True)
     status = db.Column(db.String(30), nullable=False, default="unpaid")
     due_date = db.Column(db.Date, nullable=True)
+    invoice_date = db.Column(db.Date, nullable=False, default=date.today)
     subtotal = db.Column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     tax = db.Column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     total = db.Column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
@@ -281,8 +300,11 @@ class Invoice(TimestampMixin, db.Model):
 
     booking = db.relationship("ServiceBooking", back_populates="invoices")
     vehicle = db.relationship("Vehicle", back_populates="invoices")
-    customer = db.relationship("User", foreign_keys=[customer_id])
+    customer = db.relationship("User", foreign_keys=[customer_id], back_populates="customer_invoices")
     estimate = db.relationship("Estimate")
+    service_records = db.relationship(
+        "ServiceRecord", back_populates="invoice", foreign_keys="ServiceRecord.invoice_id"
+    )
     items = db.relationship(
         "InvoiceItem", back_populates="invoice", cascade="all, delete-orphan"
     )

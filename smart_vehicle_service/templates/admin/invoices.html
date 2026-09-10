@@ -1,0 +1,54 @@
+{% extends "admin/base.html" %}
+{% set active_page = "service-records" %}
+{% block content %}
+<main class="admin-main">
+    <section class="admin-heading">
+        <div>
+            <p class="eyebrow">Billing</p>
+            <h1>Invoices</h1>
+            <p>Track completed services, totals, taxes and payment status.</p>
+        </div>
+    </section>
+
+    {% if invoices %}
+    <section class="service-record-admin-table">
+        <div class="service-record-admin-head">
+            <span>Invoice</span>
+            <span>Customer</span>
+            <span>Vehicle</span>
+            <span>Service</span>
+            <span>Date</span>
+            <span>Total</span>
+            <span>Status</span>
+        </div>
+        {% for invoice in invoices %}
+        <div class="service-record-admin-row">
+            <span><strong>{{ invoice.invoice_number }}</strong><small>{{ invoice.id }}</small></span>
+            <span>{{ invoice.customer.name if invoice.customer else 'Unknown' }}</span>
+            <span>{{ invoice.vehicle.manufacturer }} {{ invoice.vehicle.model }}<small>{{ invoice.vehicle.registration_number }}</small></span>
+            <span>{{ invoice.booking.service_type if invoice.booking else 'Service' }}</span>
+            <span>{{ invoice.invoice_date.strftime('%d %b %Y') }}</span>
+            <span><strong>{{ "%.2f"|format(invoice.total|float) }}</strong><small>Tax {{ "%.2f"|format(invoice.tax|float) }}</small></span>
+            <span>
+                <form method="post" action="{{ url_for('dashboard.update_invoice_status', invoice_id=invoice.id) }}">
+                    <select name="status" onchange="this.form.submit()">
+                        <option value="unpaid" {% if invoice.status == 'unpaid' %}selected{% endif %}>Unpaid</option>
+                        <option value="paid" {% if invoice.status == 'paid' %}selected{% endif %}>Paid</option>
+                        <option value="pending" {% if invoice.status == 'pending' %}selected{% endif %}>Pending</option>
+                        <option value="partial" {% if invoice.status == 'partial' %}selected{% endif %}>Partial</option>
+                        <option value="cancelled" {% if invoice.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                        <option value="overdue" {% if invoice.status == 'overdue' %}selected{% endif %}>Overdue</option>
+                    </select>
+                </form>
+            </span>
+        </div>
+        {% endfor %}
+    </section>
+    {% else %}
+    <section class="admin-empty admin-empty-large">
+        <strong>No invoices yet.</strong>
+        <p>Completed services will create invoices automatically.</p>
+    </section>
+    {% endif %}
+</main>
+{% endblock %}

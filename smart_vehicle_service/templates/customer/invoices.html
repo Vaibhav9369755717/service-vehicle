@@ -1,0 +1,37 @@
+{% extends "customer/vehicle_base.html" %}
+{% set active_page = "service-history" %}
+{% block content %}
+<section class="vehicle-detail-heading">
+    <div>
+        <p class="eyebrow">Billing</p>
+        <h2>Invoices</h2>
+    </div>
+</section>
+{% if invoices %}
+<section class="service-record-admin-table">
+    <div class="service-record-admin-head">
+        <span>Invoice</span>
+        <span>Vehicle</span>
+        <span>Service</span>
+        <span>Date</span>
+        <span>Total</span>
+        <span>Status</span>
+    </div>
+    {% for invoice in invoices %}
+    <div class="service-record-admin-row">
+        <span><strong><a href="{{ url_for('customer.customer_invoice_detail', invoice_id=invoice.id) }}">{{ invoice.invoice_number }}</a></strong><small>{{ invoice.booking.service_type if invoice.booking else 'Service' }}</small></span>
+        <span>{{ invoice.vehicle.manufacturer }} {{ invoice.vehicle.model }}<small>{{ invoice.vehicle.registration_number }}</small></span>
+        <span>{{ invoice.booking.service_type if invoice.booking else 'Service' }}</span>
+        <span>{{ invoice.invoice_date.strftime('%d %b %Y') }}</span>
+        <span><strong>{{ "%.2f"|format(invoice.total|float) }}</strong></span>
+        <span><span class="status-badge status-{{ invoice.status|lower|replace(' ', '-') }}">{{ invoice.status|title }}</span></span>
+    </div>
+    {% endfor %}
+</section>
+{% else %}
+<section class="admin-empty admin-empty-large">
+    <strong>No invoices yet.</strong>
+    <p>Your completed service invoices will appear here.</p>
+</section>
+{% endif %}
+{% endblock %}

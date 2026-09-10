@@ -1,0 +1,53 @@
+{% extends "customer/vehicle_base.html" %}
+{% set active_page = "service-history" %}
+{% block content %}
+<section class="vehicle-detail-heading">
+    <div>
+        <a class="back-link" href="{{ url_for('customer.customer_invoices') }}">&larr; Invoices</a>
+        <p class="eyebrow">Invoice</p>
+        <h2>{{ invoice.invoice_number }}</h2>
+        <p>{{ invoice.vehicle.manufacturer }} {{ invoice.vehicle.model }} &middot; {{ invoice.vehicle.registration_number }}</p>
+    </div>
+    <span class="status-badge status-{{ invoice.status|lower|replace(' ', '-') }}">{{ invoice.status|title }}</span>
+</section>
+
+<section class="detail-grid">
+    <article class="vehicle-info-card">
+        <div class="card-heading">
+            <div><p class="card-kicker">Billing information</p><h3>Invoice details</h3></div>
+            <span class="detail-icon" aria-hidden="true">&#9636;</span>
+        </div>
+        <dl class="vehicle-info-list">
+            <div><dt>Invoice number</dt><dd>{{ invoice.invoice_number }}</dd></div>
+            <div><dt>Invoice date</dt><dd>{{ invoice.invoice_date.strftime('%d %b %Y') }}</dd></div>
+            <div><dt>Customer</dt><dd>{{ invoice.customer.name }}</dd></div>
+            <div><dt>Service</dt><dd>{{ invoice.booking.service_type if invoice.booking else 'Service' }}</dd></div>
+            <div><dt>Vehicle</dt><dd>{{ invoice.vehicle.manufacturer }} {{ invoice.vehicle.model }}</dd></div>
+        </dl>
+    </article>
+
+    <article class="vehicle-info-card">
+        <div class="card-heading">
+            <div><p class="card-kicker">Charges</p><h3>Cost summary</h3></div>
+            <span class="detail-icon" aria-hidden="true">&#9638;</span>
+        </div>
+        <div class="history-copy">
+            <p>Labour charges: {{ "%.2f"|format(invoice.subtotal|float if invoice.subtotal else 0.0) }}</p>
+            <p>Parts charges: {{ "%.2f"|format((invoice.total - invoice.tax - (invoice.subtotal if invoice.subtotal else 0))|float if invoice.total else 0.0) }}</p>
+            <p>Additional charges: {{ "%.2f"|format(0.0) }}</p>
+            <p>Subtotal: {{ "%.2f"|format(invoice.subtotal|float if invoice.subtotal else 0.0) }}</p>
+            <p>Tax / GST: {{ "%.2f"|format(invoice.tax|float) }}</p>
+            <p><strong>Grand total: {{ "%.2f"|format(invoice.total|float) }}</strong></p>
+        </div>
+        {% if service_record %}
+        <div class="history-copy">
+            <strong>Work performed</strong>
+            <p>{{ service_record.work_performed }}</p>
+        </div>
+        {% endif %}
+        <div class="inspection-form-actions">
+            <button class="button button-secondary" type="button" onclick="window.print()">Print / Download</button>
+        </div>
+    </article>
+</section>
+{% endblock %}

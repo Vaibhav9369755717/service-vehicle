@@ -1,8 +1,8 @@
 from calendar import month_abbr
 from datetime import date, datetime, time
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import extract, func, or_
@@ -30,6 +30,7 @@ MECHANIC_PENDING_STATUSES = {"requested", "pending", "confirmed", "assigned"}
 MECHANIC_ACCEPTED_STATUSES = {"accepted"}
 MECHANIC_PROGRESS_STATUSES = {"in progress", "work in progress"}
 MECHANIC_COMPLETED_STATUSES = {"completed", "closed"}
+INVOICE_TAX_RATE = Decimal("0.10")
 INSPECTION_CATEGORIES = (
     ("Engine", "engine"),
     ("Brakes", "brakes"),
@@ -228,16 +229,29 @@ def complete_mechanic_job(booking_id):
         flash(part_error, "error")
         return redirect(url_for("dashboard.mechanic_job_detail", booking_id=job.id))
 
+    inspection = Inspection.query.filter_by(booking_id=job.id).order_by(Inspection.created_at.desc()).first()
+    inspection_summary = None
+    if inspection is not None:
+        item_notes = []
+        for item in inspection.items:
+            if item.notes:
+                item_notes.append(f"{item.item_name}: {item.notes}")
+        if item_notes or inspection.notes or inspection.recommendations:
+            inspection_summary = "\n".join(
+                [part for part in [inspection.notes, *item_notes, inspection.recommendations] if part]
+            )
     service_record = ServiceRecord(
         booking=job,
         vehicle=job.vehicle,
+        customer_id=job.customer_id,
         mechanic_id=job.mechanic_id or current_user.id,
+        service_type=job.service_type,
         service_date=date.today(),
         diagnosis=request.form.get("diagnosis", "").strip() or None,
+        inspection_results=inspection_summary,
         work_performed=work_performed,
         mileage=mileage,
         notes=request.form.get("notes", "").strip() or None,
-        customer_id=job.customer_id,
         labor_charges=labor_charges,
         additional_charges=additional_charges,
     )
@@ -282,7 +296,7 @@ def complete_mechanic_job(booking_id):
             db.session.add(InvoiceItem(part=part, invoice=invoice, description=part.name, quantity=quantity, unit_price=selling_price, total=selling_price * quantity))
     else:
         invoice.subtotal = service_record.total_cost
-        invoice.total = service_record.total_cost + (invoice.tax or Decimal("0.00"))
+    calculate_invoice_totals(invoice)
     service_record.invoice_id = invoice.id
     db.session.add(
         Notification(
@@ -303,6 +317,8 @@ def complete_mechanic_job(booking_id):
 def edit_mechanic_service_record(booking_id):
     job = get_accessible_job(booking_id)
     record = ServiceRecord.query.filter_by(booking_id=job.id).order_by(ServiceRecord.created_at.desc()).first_or_404()
+    if current_user.role != "admin" and record.mechanic_id not in (None, current_user.id):
+        abort(403)
     invoice = Invoice.query.filter_by(id=record.invoice_id).first() if record.invoice_id else Invoice.query.filter_by(booking_id=job.id).first()
     errors = []
     if request.method == "POST":
@@ -330,7 +346,7 @@ def edit_mechanic_service_record(booking_id):
             record.total_cost = labor_charges + additional_charges + parts_total
             if invoice:
                 invoice.subtotal = record.total_cost
-                invoice.total = record.total_cost + (invoice.tax or Decimal("0.00"))
+                calculate_invoice_totals(invoice)
             db.session.commit()
             flash("Service record updated.", "success")
             return redirect(url_for("dashboard.mechanic_job_detail", booking_id=job.id))
@@ -673,6 +689,13 @@ def parse_nonnegative_decimal(value, label, errors, allow_blank=False):
     return parsed
 
 
+def calculate_invoice_totals(invoice):
+    subtotal = invoice.subtotal or Decimal("0.00")
+    invoice.tax = (subtotal * INVOICE_TAX_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    invoice.total = (subtotal + invoice.tax).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return invoice
+
+
 def part_stock_status(part):
     if part.quantity_in_stock == 0:
         return {"label": "Out of Stock", "tone": "danger"}
@@ -803,24 +826,6 @@ def admin_bookings():
     ).options(
         joinedload(ServiceBooking.customer), joinedload(ServiceBooking.vehicle), joinedload(ServiceBooking.mechanic)
     )
-
-
-@dashboard_bp.get("/admin/service-records")
-@role_required("admin")
-def admin_service_records():
-    records = ServiceRecord.query.options(
-        joinedload(ServiceRecord.customer),
-        joinedload(ServiceRecord.vehicle),
-        joinedload(ServiceRecord.booking),
-        joinedload(ServiceRecord.mechanic),
-        joinedload(ServiceRecord.invoice),
-        joinedload(ServiceRecord.part_usages).joinedload(PartUsage.part),
-    ).order_by(ServiceRecord.service_date.desc(), ServiceRecord.created_at.desc()).all()
-    return render_template(
-        "admin/service_records.html",
-        page_title="Service Records",
-        records=records,
-    )
     if search:
         pattern = f"%{search}%"
         query = query.filter(or_(
@@ -846,6 +851,58 @@ def admin_service_records():
         service_types=service_types,
         filters={"q": search, "status": status, "service_type": service_type, "date": date_value},
     )
+
+
+@dashboard_bp.get("/admin/service-records")
+@role_required("admin")
+def admin_service_records():
+    records = ServiceRecord.query.options(
+        joinedload(ServiceRecord.customer),
+        joinedload(ServiceRecord.vehicle),
+        joinedload(ServiceRecord.booking),
+        joinedload(ServiceRecord.mechanic),
+        joinedload(ServiceRecord.invoice),
+        joinedload(ServiceRecord.part_usages).joinedload(PartUsage.part),
+    ).order_by(ServiceRecord.service_date.desc(), ServiceRecord.created_at.desc()).all()
+    return render_template(
+        "admin/service_records.html",
+        page_title="Service Records",
+        records=records,
+    )
+
+
+@dashboard_bp.get("/admin/invoices")
+@role_required("admin")
+def admin_invoices():
+    invoices = Invoice.query.options(
+        joinedload(Invoice.customer),
+        joinedload(Invoice.vehicle),
+        joinedload(Invoice.booking),
+    ).order_by(Invoice.invoice_date.desc(), Invoice.created_at.desc()).all()
+    return render_template(
+        "admin/invoices.html",
+        page_title="Invoices",
+        invoices=invoices,
+    )
+
+
+@dashboard_bp.post("/admin/invoices/<int:invoice_id>/status")
+@role_required("admin")
+def update_invoice_status(invoice_id):
+    invoice = Invoice.query.get_or_404(invoice_id)
+    new_status = (request.form.get("status") or "").strip().lower()
+    allowed_statuses = {"unpaid", "paid", "pending", "partial", "cancelled", "overdue"}
+    if new_status not in allowed_statuses:
+        flash("Please select a valid invoice status.", "error")
+        return redirect(url_for("dashboard.admin_invoices"))
+    invoice.status = new_status
+    if new_status in {"paid"}:
+        invoice.paid_at = datetime.utcnow()
+    elif invoice.paid_at is not None and new_status != "paid":
+        invoice.paid_at = None
+    db.session.commit()
+    flash("Invoice status updated.", "success")
+    return redirect(url_for("dashboard.admin_invoices"))
 
 
 @dashboard_bp.get("/admin/bookings/<int:booking_id>")

@@ -65,6 +65,8 @@ def add_missing_columns():
         "service_records": {
             "customer_id": "INTEGER",
             "invoice_id": "INTEGER",
+            "service_type": "VARCHAR(100) NOT NULL DEFAULT 'General Service'",
+            "inspection_results": "TEXT",
             "labor_charges": "NUMERIC(12, 2) NOT NULL DEFAULT 0",
             "additional_charges": "NUMERIC(12, 2) NOT NULL DEFAULT 0",
             "total_cost": "NUMERIC(12, 2) NOT NULL DEFAULT 0",

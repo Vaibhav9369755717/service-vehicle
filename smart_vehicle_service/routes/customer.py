@@ -320,6 +320,41 @@ def service_history_detail(record_id):
     )
 
 
+@customer_bp.get("/customer/invoices")
+@role_required("customer")
+def customer_invoices():
+    invoices = (
+        Invoice.query.filter_by(customer_id=current_user.id)
+        .options(joinedload(Invoice.vehicle), joinedload(Invoice.booking))
+        .order_by(Invoice.invoice_date.desc(), Invoice.created_at.desc())
+        .all()
+    )
+    return render_template(
+        "customer/invoices.html",
+        page_title="Invoices",
+        invoices=invoices,
+    )
+
+
+@customer_bp.get("/customer/invoices/<int:invoice_id>")
+@role_required("customer")
+def customer_invoice_detail(invoice_id):
+    invoice = (
+        Invoice.query.filter_by(id=invoice_id, customer_id=current_user.id)
+        .options(joinedload(Invoice.vehicle), joinedload(Invoice.booking), joinedload(Invoice.customer))
+        .first_or_404()
+    )
+    service_record = ServiceRecord.query.filter_by(booking_id=invoice.booking_id).order_by(
+        ServiceRecord.created_at.desc()
+    ).first()
+    return render_template(
+        "customer/invoice_detail.html",
+        page_title=f"Invoice {invoice.invoice_number}",
+        invoice=invoice,
+        service_record=service_record,
+    )
+
+
 @customer_bp.post("/customer/notifications/<int:notification_id>/read")
 @role_required("customer")
 def mark_notification_read(notification_id):
