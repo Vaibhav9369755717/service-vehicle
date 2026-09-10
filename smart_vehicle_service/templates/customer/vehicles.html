@@ -1,0 +1,24 @@
+{% extends "customer/vehicle_base.html" %}
+{% set active_page = "vehicles" %}
+{% block content %}
+<section class="vehicle-page-heading">
+    <div><p class="eyebrow">Your garage</p><h2>My vehicles</h2><p>Keep every vehicle and its service details in one place.</p></div>
+    <a class="button button-primary" href="{{ url_for('customer.add_vehicle') }}">Add vehicle <span aria-hidden="true">+</span></a>
+</section>
+{% if vehicles %}
+<section class="vehicle-grid" aria-label="Your vehicles">
+    {% for vehicle in vehicles %}
+    {% set last_service = last_services.get(vehicle.id) %}
+    <article class="vehicle-management-card">
+        <div class="vehicle-card-visual"><span class="vehicle-large-icon" aria-hidden="true">&#9638;</span><span class="vehicle-health-placeholder">Health: Not assessed</span></div>
+        <div class="vehicle-card-body"><div class="vehicle-card-title"><div><p class="card-kicker">{{ vehicle.registration_number }}</p><h3>{{ vehicle.manufacturer }} {{ vehicle.model }}</h3>{% if vehicle.variant %}<span>{{ vehicle.variant }}</span>{% endif %}</div><span class="vehicle-menu-mark" aria-hidden="true">&#8226;&#8226;&#8226;</span></div>
+            <div class="vehicle-specs"><span><b>Fuel</b>{{ vehicle.fuel_type }}</span><span><b>Mileage</b>{{ "{:,}".format(vehicle.mileage) }} km</span><span><b>Last service</b>{% if last_service %}{{ last_service.service_date.strftime('%d %b %Y') }}{% else %}Not recorded{% endif %}</span></div>
+            <div class="vehicle-card-actions"><a class="button button-secondary" href="{{ url_for('customer.vehicle_details', vehicle_id=vehicle.id) }}">View details <span aria-hidden="true">&#8599;</span></a><a class="icon-action" href="{{ url_for('customer.edit_vehicle', vehicle_id=vehicle.id) }}" aria-label="Edit {{ vehicle.manufacturer }} {{ vehicle.model }}">Edit</a></div>
+        </div>
+    </article>
+    {% endfor %}
+</section>
+{% else %}
+<section class="vehicle-empty-state"><span class="vehicle-empty-icon" aria-hidden="true">&#9638;</span><h3>No vehicles added yet.</h3><p>Add your first vehicle to start tracking service history, mileage, and maintenance details.</p><a class="button button-primary" href="{{ url_for('customer.add_vehicle') }}">Add your vehicle <span aria-hidden="true">+</span></a></section>
+{% endif %}
+{% endblock %}

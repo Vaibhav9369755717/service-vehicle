@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title }} | Smart Vehicle Service</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/vehicle.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/booking.css') }}">
+</head>
+<body class="customer-dashboard vehicle-page">
+    <div class="dashboard-app">
+        <div class="sidebar-backdrop" data-sidebar-close></div>
+        <aside class="dashboard-sidebar" id="dashboard-sidebar">
+            <div class="sidebar-header">
+                <a class="brand" href="{{ url_for('home') }}" aria-label="Smart Vehicle Service home"><span class="brand-mark" aria-hidden="true">SV</span><span class="brand-name">Smart<span>Vehicle</span></span></a>
+                <button class="sidebar-close" type="button" data-sidebar-close aria-label="Close navigation">&times;</button>
+            </div>
+            <div class="sidebar-label">Workspace</div>
+            <nav class="sidebar-nav" aria-label="Customer dashboard navigation">
+                <a class="sidebar-link" href="{{ url_for('customer.customer_dashboard') }}"><span class="nav-icon" aria-hidden="true">&#9632;</span>Dashboard</a>
+                <a class="sidebar-link {% if active_page == 'vehicles' %}active{% endif %}" href="{{ url_for('customer.customer_vehicles') }}"><span class="nav-icon" aria-hidden="true">&#9638;</span>My Vehicles</a>
+                <a class="sidebar-link {% if active_page == 'book-service' %}active{% endif %}" href="{{ url_for('customer.book_service') }}"><span class="nav-icon" aria-hidden="true">+</span>Book Service</a>
+                <a class="sidebar-link" href="{{ url_for('customer.customer_bookings') }}"><span class="nav-icon" aria-hidden="true">&#9776;</span>My Bookings</a>
+                <a class="sidebar-link" href="{{ url_for('customer.customer_dashboard') }}#service-history"><span class="nav-icon" aria-hidden="true">&#8635;</span>Service History</a>
+                <a class="sidebar-link" href="{{ url_for('customer.customer_dashboard') }}#vehicle-health"><span class="nav-icon" aria-hidden="true">&#9829;</span>Vehicle Health</a>
+                <a class="sidebar-link" href="{{ url_for('customer.customer_dashboard') }}#notifications"><span class="nav-icon" aria-hidden="true">&#9678;</span>Reminders</a>
+                <a class="sidebar-link" href="{{ url_for('customer.customer_dashboard') }}#invoices"><span class="nav-icon" aria-hidden="true">&#9636;</span>Invoices</a>
+                <a class="sidebar-link" href="{{ url_for('customer.customer_dashboard') }}#profile"><span class="nav-icon" aria-hidden="true">&#9673;</span>Profile</a>
+            </nav>
+            <div class="sidebar-footer"><form method="post" action="{{ url_for('auth.logout') }}"><button class="sidebar-link sidebar-logout" type="submit"><span class="nav-icon" aria-hidden="true">&#8594;</span>Logout</button></form></div>
+        </aside>
+        <div class="dashboard-content">
+            <header class="dashboard-topbar"><div class="topbar-inner">
+                <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="Open navigation" aria-expanded="false"><span></span><span></span><span></span></button>
+                <div class="topbar-title"><span class="topbar-kicker">Customer workspace</span><h1>{{ page_title }}</h1></div>
+                <div class="topbar-actions"><div class="profile-wrap"><a class="profile-trigger" href="{{ url_for('customer.customer_dashboard') }}#profile"><span class="profile-avatar">{{ current_user.name[:1]|upper }}</span><span class="profile-name">{{ current_user.name }}</span></a></div></div>
+            </div></header>
+            <main class="vehicle-main">{% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<div class="vehicle-flashes">{% for category, message in messages %}<div class="flash flash-{{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}{% block content %}{% endblock %}</main>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Access denied | Smart Vehicle Service</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="auth-page">
+    <main class="error-shell">
+        <a class="brand" href="{{ url_for('home') }}"><span class="brand-mark" aria-hidden="true">SV</span><span class="brand-name">Smart<span>Vehicle</span></span></a>
+        <p class="eyebrow">403 / Access denied</p>
+        <h1>This service area is reserved for another role.</h1>
+        <p>Your account does not have permission to view this page.</p>
+        <a class="button button-primary" href="{{ url_for('home') }}">Return home <span aria-hidden="true">&rarr;</span></a>
+    </main>
+</body>
+</html>

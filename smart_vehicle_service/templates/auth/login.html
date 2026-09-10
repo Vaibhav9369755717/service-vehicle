@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Log in | Smart Vehicle Service</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="auth-page">
+    <main class="auth-shell">
+        <section class="auth-panel auth-brand-panel">
+            <a class="brand" href="{{ url_for('home') }}" aria-label="Smart Vehicle Service home">
+                <span class="brand-mark" aria-hidden="true">SV</span>
+                <span class="brand-name">Smart<span>Vehicle</span></span>
+            </a>
+            <div class="auth-brand-copy">
+                <p class="eyebrow">Vehicle care, intelligently managed</p>
+                <h1>Keep every mile <em>moving.</em></h1>
+                <p>Sign in to keep your vehicle service journey clear, connected, and ready for the road.</p>
+            </div>
+        </section>
+        <section class="auth-panel auth-form-panel">
+            <div class="auth-form-wrap">
+                <p class="eyebrow">Welcome back</p>
+                <h2>Log in</h2>
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="auth-flashes" aria-live="polite">
+                            {% for category, message in messages %}
+                                <div class="flash flash-{{ category }}">{{ message }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+                <form class="auth-form" method="post">
+                    <label for="email">Email address</label>
+                    <input id="email" name="email" type="email" value="{{ email }}" autocomplete="email" required>
+                    <label for="password">Password</label>
+                    <input id="password" name="password" type="password" autocomplete="current-password" required>
+                    <button class="button button-primary auth-submit" type="submit">Log in <span aria-hidden="true">&rarr;</span></button>
+                </form>
+                <p class="auth-switch">New to SmartVehicle? <a href="{{ url_for('auth.register') }}">Create an account</a></p>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

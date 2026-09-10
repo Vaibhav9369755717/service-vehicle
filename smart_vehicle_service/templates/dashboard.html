@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title }} | Smart Vehicle Service</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="dashboard-page">
+    <header class="site-header"><nav class="navbar container" aria-label="Primary navigation">
+        <a class="brand" href="{{ url_for('home') }}"><span class="brand-mark" aria-hidden="true">SV</span><span class="brand-name">Smart<span>Vehicle</span></span></a>
+        <form class="nav-logout" method="post" action="{{ url_for('auth.logout') }}"><button type="submit">Log out</button></form>
+    </nav></header>
+    <main class="dashboard-shell container">
+        <p class="eyebrow">{{ role_label }}</p>
+        <h1>{{ page_title }}</h1>
+        <p class="dashboard-note">Your authenticated {{ role_label|lower }} workspace is ready. Feature workflows will be introduced in a later phase.</p>
+    </main>
+</body>
+</html>
