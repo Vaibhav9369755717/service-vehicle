@@ -160,3 +160,26 @@ def test_non_admin_cannot_access_admin_dashboard(client):
     response = client.get("/admin/dashboard")
 
     assert response.status_code == 403
+
+
+def test_admin_reports_page_displays_report_sections_and_filters(client):
+    login(client, "dashboard-admin@example.com", "admin-pass")
+
+    response = client.get("/admin/reports")
+
+    assert response.status_code == 200
+    assert b"Admin reports" in response.data
+    assert b"Revenue" in response.data
+    assert b"Bookings" in response.data
+    assert b"Services" in response.data
+    assert b"Customers" in response.data
+    assert b"Vehicles" in response.data
+    assert b"Mechanics" in response.data
+    assert b"Inventory" in response.data
+    assert b"Payments" in response.data
+    assert b"Today" in response.data
+    assert b"This week" in response.data
+    assert b"This month" in response.data
+    assert b"This year" in response.data
+    assert b"Total revenue" in response.data
+    assert b"Booking trends" in response.data

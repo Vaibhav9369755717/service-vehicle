@@ -30,6 +30,12 @@ class User(UserMixin, TimestampMixin, db.Model):
     specialization = db.Column(db.String(120), nullable=True)
     role = db.Column(db.String(30), nullable=False, default="customer")
 
+    customer_payments = db.relationship(
+        "Payment",
+        foreign_keys="Payment.customer_id",
+        back_populates="customer",
+        cascade="all, delete-orphan",
+    )
     vehicles = db.relationship(
         "Vehicle", back_populates="owner", cascade="all, delete-orphan"
     )
@@ -308,6 +314,31 @@ class Invoice(TimestampMixin, db.Model):
     items = db.relationship(
         "InvoiceItem", back_populates="invoice", cascade="all, delete-orphan"
     )
+    payments = db.relationship(
+        "Payment", back_populates="invoice", cascade="all, delete-orphan"
+    )
+
+
+class Payment(TimestampMixin, db.Model):
+    __tablename__ = "payments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    invoice_id = db.Column(
+        db.Integer, db.ForeignKey("invoices.id", ondelete="CASCADE"), nullable=False
+    )
+    customer_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    payment_reference = db.Column(db.String(80), nullable=False, unique=True, index=True)
+    transaction_id = db.Column(db.String(80), nullable=False, unique=True, index=True)
+    amount = db.Column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    status = db.Column(db.String(30), nullable=False, default="pending")
+    payment_method = db.Column(db.String(50), nullable=False, default="internal_mock")
+    payment_date = db.Column(db.DateTime, nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+
+    invoice = db.relationship("Invoice", back_populates="payments")
+    customer = db.relationship("User", foreign_keys=[customer_id], back_populates="customer_payments")
 
 
 class InvoiceItem(TimestampMixin, db.Model):

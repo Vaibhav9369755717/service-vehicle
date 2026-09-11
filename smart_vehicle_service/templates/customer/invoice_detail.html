@@ -23,7 +23,20 @@
             <div><dt>Customer</dt><dd>{{ invoice.customer.name }}</dd></div>
             <div><dt>Service</dt><dd>{{ invoice.booking.service_type if invoice.booking else 'Service' }}</dd></div>
             <div><dt>Vehicle</dt><dd>{{ invoice.vehicle.manufacturer }} {{ invoice.vehicle.model }}</dd></div>
+            <div><dt>Payment status</dt><dd><span class="status-badge status-{{ payment_status|lower|replace(' ', '-') }}">{{ payment_status }}</span></dd></div>
         </dl>
+        <div class="inspection-form-actions">
+            <form method="post" action="{{ url_for('customer.submit_invoice_payment', invoice_id=invoice.id) }}">
+                <input type="hidden" name="payment_method" value="internal_mock">
+                <select name="status" aria-label="Payment status">
+                    <option value="pending" {% if latest_payment and latest_payment.status == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="paid" {% if invoice.status == 'paid' %}selected{% endif %}>Paid</option>
+                    <option value="failed">Failed</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+                <button class="button button-primary" type="submit">Process mock payment</button>
+            </form>
+        </div>
     </article>
 
     <article class="vehicle-info-card">
@@ -45,6 +58,23 @@
             <p>{{ service_record.work_performed }}</p>
         </div>
         {% endif %}
+        <div class="history-copy">
+            <strong>Payment history</strong>
+            {% if payment_history %}
+                <ul>
+                    {% for payment in payment_history %}
+                    <li>
+                        {{ payment.status|title }} - {{ payment.amount }}
+                        {% if payment.payment_reference %}<small>Ref: {{ payment.payment_reference }}</small>{% endif %}
+                        {% if payment.transaction_id %}<small>Txn: {{ payment.transaction_id }}</small>{% endif %}
+                        {% if payment.payment_date %}<small>Date: {{ payment.payment_date.strftime('%d %b %Y %H:%M') }}</small>{% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>No payment records yet.</p>
+            {% endif %}
+        </div>
         <div class="inspection-form-actions">
             <button class="button button-secondary" type="button" onclick="window.print()">Print / Download</button>
         </div>

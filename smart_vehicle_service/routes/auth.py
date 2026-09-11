@@ -1,12 +1,15 @@
 import re
 from urllib.parse import urljoin, urlparse
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
-from flask_login import current_user, login_user, logout_user
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import User, db
+try:
+    from smart_vehicle_service.models import User, db
+except ImportError:  # pragma: no cover - local development fallback
+    from models import User, db
 
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
@@ -97,6 +100,78 @@ def login():
             return redirect(url_for(role_dashboard(user.role)))
 
     return render_template("auth/login.html", email=email)
+
+
+@auth_bp.route("/profile", methods=["GET", "POST"])
+@login_required
+def profile():
+    return profile_detail(current_user.id)
+
+
+@auth_bp.route("/profile/<int:user_id>", methods=["GET", "POST"])
+@login_required
+def profile_detail(user_id):
+    if user_id != current_user.id:
+        abort(403)
+
+    user = User.query.get_or_404(user_id)
+    form = {
+        "name": user.name,
+        "email": user.email,
+        "phone": user.phone or "",
+    }
+    errors = []
+
+    if request.method == "POST":
+        form = {
+            "name": request.form.get("name", "").strip(),
+            "email": request.form.get("email", "").strip().lower(),
+            "phone": request.form.get("phone", "").strip(),
+        }
+        current_password = request.form.get("current_password", "")
+        new_password = request.form.get("new_password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        if not form["name"]:
+            errors.append("Name is required.")
+        if not form["email"] or not EMAIL_PATTERN.fullmatch(form["email"]):
+            errors.append("Please enter a valid email address.")
+        if not form["phone"]:
+            errors.append("Phone number is required.")
+        elif len(form["phone"]) < 7:
+            errors.append("Phone number must be at least 7 characters.")
+
+        duplicate_user = User.query.filter(User.email == form["email"], User.id != user.id).first()
+        if duplicate_user:
+            errors.append("An account with that email already exists.")
+
+        password_change_requested = bool(new_password or confirm_password)
+        if password_change_requested:
+            if not current_password:
+                errors.append("Current password is required to change your password.")
+            elif not check_password_hash(user.password_hash, current_password):
+                errors.append("Current password is incorrect.")
+            elif len(new_password) < MIN_PASSWORD_LENGTH:
+                errors.append("New password must be at least 8 characters long.")
+            elif new_password != confirm_password:
+                errors.append("New password and confirmation do not match.")
+
+        if not errors:
+            user.name = form["name"]
+            user.email = form["email"]
+            user.phone = form["phone"]
+            if password_change_requested:
+                user.password_hash = generate_password_hash(new_password)
+            try:
+                db.session.commit()
+            except IntegrityError:
+                db.session.rollback()
+                errors.append("Could not update your profile. Please try again.")
+            else:
+                flash("Your profile was updated successfully.", "success")
+                return redirect(url_for("auth.profile"))
+
+    return render_template("auth/profile.html", user=user, form=form, errors=errors)
 
 
 @auth_bp.post("/logout")

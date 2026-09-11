@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Profile | Smart Vehicle Service</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="auth-page">
+    <main class="auth-shell">
+        <section class="auth-panel auth-brand-panel">
+            <a class="brand" href="{{ url_for('home') }}" aria-label="Smart Vehicle Service home">
+                <span class="brand-mark" aria-hidden="true">SV</span>
+                <span class="brand-name">Smart<span>Vehicle</span></span>
+            </a>
+            <div class="auth-brand-copy">
+                <p class="eyebrow">Account</p>
+                <h1>Profile <em>settings</em></h1>
+                <p>Keep your contact details secure and update your password whenever needed.</p>
+            </div>
+        </section>
+        <section class="auth-panel auth-form-panel">
+            <div class="auth-form-wrap">
+                <p class="eyebrow">Profile</p>
+                <h2>Update profile</h2>
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="auth-flashes" aria-live="polite">
+                            {% for category, message in messages %}
+                                <div class="flash flash-{{ category }}">{{ message }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+                {% if errors %}
+                    <div class="auth-flashes" aria-live="polite">
+                        {% for error in errors %}
+                            <div class="flash flash-error">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                <form class="auth-form" method="post" action="{{ url_for('auth.profile') }}">
+                    <div class="form-row">
+                        <div>
+                            <label for="name">Name</label>
+                            <input id="name" name="name" type="text" value="{{ form.name }}" required>
+                        </div>
+                        <div>
+                            <label for="phone">Phone</label>
+                            <input id="phone" name="phone" type="tel" value="{{ form.phone }}" required>
+                        </div>
+                    </div>
+                    <label for="email">Email</label>
+                    <input id="email" name="email" type="email" value="{{ form.email }}" required>
+
+                    <label for="current_password">Current password</label>
+                    <input id="current_password" name="current_password" type="password" autocomplete="current-password" placeholder="Required only when changing password">
+
+                    <div class="form-row">
+                        <div>
+                            <label for="new_password">New password</label>
+                            <input id="new_password" name="new_password" type="password" autocomplete="new-password" placeholder="Optional">
+                        </div>
+                        <div>
+                            <label for="confirm_password">Confirm password</label>
+                            <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" placeholder="Optional">
+                        </div>
+                    </div>
+
+                    <button class="button button-primary auth-submit" type="submit">Save changes <span aria-hidden="true">&rarr;</span></button>
+                    <a class="text-link" href="{% if current_user.role == 'customer' %}{{ url_for('customer.customer_dashboard') }}{% elif current_user.role == 'mechanic' %}{{ url_for('dashboard.mechanic_dashboard') }}{% else %}{{ url_for('dashboard.admin_dashboard') }}{% endif %}">Back to dashboard</a>
+                </form>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

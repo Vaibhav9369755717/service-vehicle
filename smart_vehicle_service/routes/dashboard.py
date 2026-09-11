@@ -1,5 +1,5 @@
 from calendar import month_abbr
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
@@ -8,21 +8,40 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import extract, func, or_
 from sqlalchemy.orm import joinedload
 
-from models import (
-    Inspection,
-    InspectionItem,
-    Invoice,
-    InvoiceItem,
-    Notification,
-    Part,
-    PartUsage,
-    ServiceBooking,
-    ServiceRecord,
-    User,
-    Vehicle,
-    db,
-)
-from routes.decorators import role_required
+try:
+    from smart_vehicle_service.models import (
+        Inspection,
+        InspectionItem,
+        Invoice,
+        InvoiceItem,
+        Notification,
+        Part,
+        PartUsage,
+        Payment,
+        ServiceBooking,
+        ServiceRecord,
+        User,
+        Vehicle,
+        db,
+    )
+    from smart_vehicle_service.routes.decorators import role_required
+except ImportError:  # pragma: no cover - local development fallback
+    from models import (
+        Inspection,
+        InspectionItem,
+        Invoice,
+        InvoiceItem,
+        Notification,
+        Part,
+        PartUsage,
+        Payment,
+        ServiceBooking,
+        ServiceRecord,
+        User,
+        Vehicle,
+        db,
+    )
+    from routes.decorators import role_required
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
@@ -527,6 +546,20 @@ def notify_booking_customer(booking, title, message, notification_type):
     )
 
 
+def notify_payment_customer(invoice, title, message):
+    if invoice is None or invoice.customer_id is None:
+        return None
+    notification = Notification(
+        user_id=invoice.customer_id,
+        invoice_id=invoice.id,
+        title=title,
+        message=message,
+        notification_type="payment_received",
+    )
+    db.session.add(notification)
+    return notification
+
+
 def parse_admin_date(value):
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
@@ -736,6 +769,109 @@ def monthly_revenue_data():
     return [{"label": month["label"], "value": values.get(month["key"], 0)} for month in report_months()]
 
 
+def resolve_report_dates(period, start_date=None, end_date=None):
+    today = date.today()
+    if period == "custom":
+        if start_date is not None and end_date is not None:
+            return start_date, end_date
+        period = "this_month"
+
+    if period == "today":
+        return today, today
+    if period == "this_week":
+        start = today - timedelta(days=today.weekday())
+        return start, today
+    if period == "this_month":
+        return today.replace(day=1), today
+    if period == "this_year":
+        return today.replace(month=1, day=1), today
+    return today.replace(day=1), today
+
+
+def report_range_label(start_date, end_date):
+    if start_date == end_date:
+        return start_date.strftime("%d %b %Y")
+    return f"{start_date.strftime('%d %b %Y')} to {end_date.strftime('%d %b %Y')}"
+
+
+def booking_trend_data(start_date, end_date):
+    days = (end_date - start_date).days + 1
+    labels = []
+    values = []
+    for offset in range(days):
+        current_day = start_date + timedelta(days=offset)
+        labels.append(current_day.strftime("%d %b") if days <= 31 else current_day.strftime("%b %d"))
+        values.append(
+            ServiceBooking.query.filter(ServiceBooking.booking_date == current_day).count()
+        )
+    max_value = max(values, default=0)
+    return [{"label": label, "value": value} for label, value in zip(labels, values)], max_value
+
+
+def top_service_rows(start_date, end_date):
+    rows = db.session.query(
+        ServiceBooking.service_type,
+        func.count(ServiceBooking.id).label("total"),
+    ).filter(ServiceBooking.booking_date.between(start_date, end_date)).group_by(
+        ServiceBooking.service_type
+    ).order_by(func.count(ServiceBooking.id).desc()).limit(8).all()
+    return [{"label": label, "value": total} for label, total in rows]
+
+
+def customer_growth_rows(start_date, end_date):
+    rows = db.session.query(
+        func.strftime("%Y-%m", User.created_at).label("month"),
+        func.count(User.id).label("total"),
+    ).filter(User.role == "customer").filter(User.created_at >= datetime.combine(start_date, time.min)).filter(
+        User.created_at <= datetime.combine(end_date, time.max)
+    ).group_by(func.strftime("%Y-%m", User.created_at)).order_by("month").all()
+    return [{"label": row.month, "value": row.total} for row in rows]
+
+
+def inventory_usage_rows(start_date, end_date):
+    rows = db.session.query(
+        Part.name,
+        func.sum(PartUsage.quantity).label("quantity_used"),
+    ).join(PartUsage, PartUsage.part_id == Part.id).filter(
+        PartUsage.used_at >= datetime.combine(start_date, time.min)
+    ).filter(
+        PartUsage.used_at <= datetime.combine(end_date, time.max)
+    ).group_by(Part.id, Part.name).order_by(func.sum(PartUsage.quantity).desc()).limit(8).all()
+    return [{"label": label, "value": float(quantity or 0)} for label, quantity in rows]
+
+
+def mechanic_workload_rows(start_date, end_date):
+    rows = db.session.query(
+        User.name,
+        func.count(ServiceBooking.id).label("job_count"),
+    ).join(ServiceBooking, ServiceBooking.mechanic_id == User.id).filter(
+        User.role == "mechanic",
+        ServiceBooking.booking_date.between(start_date, end_date),
+    ).group_by(User.id, User.name).order_by(func.count(ServiceBooking.id).desc()).all()
+    return [{"label": label, "value": job_count} for label, job_count in rows]
+
+
+def payment_summary_rows(start_date, end_date):
+    rows = db.session.query(
+        Payment.payment_method,
+        func.count(Payment.id).label("count"),
+        func.coalesce(func.sum(Payment.amount), 0).label("total"),
+    ).filter(Payment.payment_date >= datetime.combine(start_date, time.min)).filter(
+        Payment.payment_date <= datetime.combine(end_date, time.max)
+    ).group_by(Payment.payment_method).order_by(func.coalesce(func.sum(Payment.amount), 0).desc()).all()
+    return [{"label": label, "value": total, "count": count} for label, count, total in rows]
+
+
+def service_summary_rows(start_date, end_date):
+    rows = db.session.query(
+        ServiceRecord.service_type,
+        func.count(ServiceRecord.id).label("total"),
+    ).filter(ServiceRecord.service_date.between(start_date, end_date)).group_by(
+        ServiceRecord.service_type
+    ).order_by(func.count(ServiceRecord.id).desc()).limit(6).all()
+    return [{"label": label, "value": total} for label, total in rows]
+
+
 def service_type_data():
     rows = db.session.query(
         ServiceBooking.service_type, func.count(ServiceBooking.id).label("total")
@@ -748,6 +884,74 @@ def booking_status_data():
         func.lower(ServiceBooking.status).label("status"), func.count(ServiceBooking.id).label("total")
     ).group_by(func.lower(ServiceBooking.status)).order_by(func.count(ServiceBooking.id).desc()).all()
     return [{"label": status.replace("_", " ").title(), "value": total} for status, total in rows]
+
+
+@dashboard_bp.get("/admin/reports")
+@role_required("admin")
+def admin_reports():
+    selected_range = request.args.get("range", "this_month")
+    start_date = parse_admin_date(request.args.get("start_date", "")) or date.today().replace(day=1)
+    end_date = parse_admin_date(request.args.get("end_date", "")) or date.today()
+    start_date, end_date = resolve_report_dates(selected_range, start_date, end_date)
+
+    total_revenue = db.session.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
+        Payment.status == "paid",
+        Payment.payment_date >= datetime.combine(start_date, time.min),
+        Payment.payment_date <= datetime.combine(end_date, time.max),
+    ).scalar() or Decimal("0.00")
+    total_bookings = ServiceBooking.query.filter(ServiceBooking.booking_date.between(start_date, end_date)).count()
+    total_services = ServiceRecord.query.filter(ServiceRecord.service_date.between(start_date, end_date)).count()
+    total_customers = User.query.filter(User.role == "customer").filter(
+        User.created_at >= datetime.combine(start_date, time.min),
+        User.created_at <= datetime.combine(end_date, time.max),
+    ).count()
+    total_vehicles = Vehicle.query.filter(
+        Vehicle.created_at >= datetime.combine(start_date, time.min),
+        Vehicle.created_at <= datetime.combine(end_date, time.max),
+    ).count()
+    total_mechanics = User.query.filter(User.role == "mechanic").count()
+    inventory_usage = inventory_usage_rows(start_date, end_date)
+    top_services = top_service_rows(start_date, end_date)
+    service_summary = service_summary_rows(start_date, end_date)
+    mechanic_workload = mechanic_workload_rows(start_date, end_date)
+    payment_summary = payment_summary_rows(start_date, end_date)
+    booking_trend, booking_trend_max = booking_trend_data(start_date, end_date)
+    customer_growth = customer_growth_rows(start_date, end_date)
+    report_summary = [
+        {"label": "Revenue", "value": f"{float(total_revenue):,.2f}", "note": "Paid revenue"},
+        {"label": "Bookings", "value": f"{total_bookings}", "note": "Booked services"},
+        {"label": "Services", "value": f"{total_services}", "note": "Completed or recorded"},
+        {"label": "Customers", "value": f"{total_customers}", "note": "New customer accounts"},
+        {"label": "Vehicles", "value": f"{total_vehicles}", "note": "New vehicles added"},
+        {"label": "Mechanics", "value": f"{total_mechanics}", "note": "Active technicians"},
+        {"label": "Inventory", "value": f"{sum(item['value'] for item in inventory_usage):,.2f}", "note": "Units used"},
+        {"label": "Payments", "value": f"{sum(float(item['total']) for item in payment_summary):,.2f}", "note": "Captured payments"},
+    ]
+    return render_template(
+        "admin/reports.html",
+        page_title="Admin reports",
+        active_page="reports",
+        report_summary=report_summary,
+        selected_range=selected_range,
+        report_range_label=report_range_label(start_date, end_date),
+        start_date=start_date.strftime("%Y-%m-%d") if start_date else "",
+        end_date=end_date.strftime("%Y-%m-%d") if end_date else "",
+        range_options=[
+            {"value": "today", "label": "Today"},
+            {"value": "this_week", "label": "This week"},
+            {"value": "this_month", "label": "This month"},
+            {"value": "this_year", "label": "This year"},
+        ],
+        filters={"range": selected_range, "start_date": start_date.strftime("%Y-%m-%d"), "end_date": end_date.strftime("%Y-%m-%d")},
+        top_services=top_services,
+        service_summary=service_summary,
+        booking_trend=booking_trend,
+        booking_trend_max=booking_trend_max,
+        customer_growth=customer_growth,
+        inventory_usage=inventory_usage,
+        mechanic_workload=mechanic_workload,
+        payment_summary=payment_summary,
+    )
 
 
 @dashboard_bp.get("/admin/dashboard")
@@ -902,6 +1106,51 @@ def update_invoice_status(invoice_id):
         invoice.paid_at = None
     db.session.commit()
     flash("Invoice status updated.", "success")
+    return redirect(url_for("dashboard.admin_invoices"))
+
+
+@dashboard_bp.post("/admin/invoices/<int:invoice_id>/payment")
+@role_required("admin")
+def update_invoice_payment(invoice_id):
+    invoice = Invoice.query.get_or_404(invoice_id)
+    payment_status = (request.form.get("status") or "").strip().lower()
+    payment_method = (request.form.get("payment_method") or "internal_mock").strip().lower()
+    allowed_payment_statuses = {"pending", "paid", "failed", "cancelled"}
+
+    if payment_method != "internal_mock":
+        flash("Only internal mock payments are supported in this version.", "error")
+        return redirect(url_for("dashboard.admin_invoices"))
+    if payment_status not in allowed_payment_statuses:
+        flash("Please choose a valid payment status.", "error")
+        return redirect(url_for("dashboard.admin_invoices"))
+
+    payment = Payment(
+        invoice=invoice,
+        customer=invoice.customer,
+        payment_reference=f"PMT-{invoice.id}-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+        transaction_id=f"TXN-{invoice.id}-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+        amount=invoice.total,
+        status=payment_status,
+        payment_method=payment_method,
+        payment_date=datetime.utcnow(),
+        notes="Admin recorded mock payment event without storing card data.",
+    )
+    db.session.add(payment)
+
+    if payment_status == "paid":
+        invoice.status = "paid"
+        invoice.paid_at = datetime.utcnow()
+        if not Payment.query.filter_by(invoice_id=invoice.id, status="paid").count() > 1:
+            notify_payment_customer(invoice, "Payment received", f"Your payment for {invoice.invoice_number} was processed successfully.")
+    elif payment_status == "failed":
+        invoice.status = "pending"
+    elif payment_status == "cancelled":
+        invoice.status = "cancelled"
+    else:
+        invoice.status = "pending"
+
+    db.session.commit()
+    flash("Payment status recorded successfully.", "success")
     return redirect(url_for("dashboard.admin_invoices"))
 
 

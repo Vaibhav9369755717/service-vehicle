@@ -20,6 +20,7 @@
             <span>Date</span>
             <span>Total</span>
             <span>Status</span>
+            <span>Payment</span>
         </div>
         {% for invoice in invoices %}
         <div class="service-record-admin-row">
@@ -39,6 +40,18 @@
                         <option value="cancelled" {% if invoice.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
                         <option value="overdue" {% if invoice.status == 'overdue' %}selected{% endif %}>Overdue</option>
                     </select>
+                </form>
+            </span>
+            <span>
+                <form method="post" action="{{ url_for('dashboard.update_invoice_payment', invoice_id=invoice.id) }}">
+                    <select name="status" onchange="this.form.submit()">
+                        {% set latest_payment = invoice.payments[-1] if invoice.payments else none %}
+                        <option value="pending" {% if latest_payment and latest_payment.status == 'pending' %}selected{% endif %}>Pending</option>
+                        <option value="paid" {% if latest_payment and latest_payment.status == 'paid' %}selected{% endif %}>Paid</option>
+                        <option value="failed" {% if latest_payment and latest_payment.status == 'failed' %}selected{% endif %}>Failed</option>
+                        <option value="cancelled" {% if latest_payment and latest_payment.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                    </select>
+                    <input type="hidden" name="payment_method" value="internal_mock">
                 </form>
             </span>
         </div>

@@ -154,3 +154,117 @@ def test_mechanic_login_redirects_to_mechanic_dashboard(client):
 
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/mechanic/dashboard")
+
+
+def test_customer_can_view_and_edit_own_profile(client):
+    register_customer(client)
+    login(client, "customer@example.com", "customer-pass")
+
+    profile_response = client.get("/auth/profile")
+    assert profile_response.status_code == 200
+    assert b"Profile" in profile_response.data
+
+    update_response = client.post(
+        "/auth/profile",
+        data={
+            "name": "Updated Customer",
+            "email": "updated-customer@example.com",
+            "phone": "+1 555 111 2222",
+            "current_password": "customer-pass",
+            "new_password": "",
+            "confirm_password": "",
+        },
+        follow_redirects=False,
+    )
+
+    assert update_response.status_code == 302
+    with client.application.app_context():
+        user = User.query.filter_by(email="updated-customer@example.com").one()
+        assert user.name == "Updated Customer"
+        assert user.phone == "+1 555 111 2222"
+
+
+def test_profile_password_change_requires_current_password(client):
+    register_customer(client)
+    login(client, "customer@example.com", "customer-pass")
+
+    response = client.post(
+        "/auth/profile",
+        data={
+            "name": "Customer Name",
+            "email": "customer@example.com",
+            "phone": "5550000003",
+            "current_password": "wrong-password",
+            "new_password": "new-secret-pass",
+            "confirm_password": "new-secret-pass",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    assert b"Current password is incorrect" in response.data
+
+
+def test_user_cannot_access_another_users_profile(client):
+    register_customer(client)
+    with client.application.app_context():
+        other_user = User(
+            name="Another User",
+            email="another@example.com",
+            password_hash=generate_password_hash("secret-pass"),
+            phone="5550000999",
+            role="customer",
+        )
+        db.session.add(other_user)
+        db.session.commit()
+        other_id = other_user.id
+
+    login(client, "customer@example.com", "customer-pass")
+    response = client.get(f"/auth/profile/{other_id}")
+
+    assert response.status_code == 403
+
+
+def test_session_cookie_has_security_flags(client):
+    register_customer(client)
+    response = login(client, "customer@example.com", "customer-pass")
+
+    cookie_header = response.headers.get("Set-Cookie", "")
+    assert "HttpOnly" in cookie_header
+    assert "SameSite=Lax" in cookie_header
+
+
+def test_profile_post_without_csrf_token_is_rejected_when_enabled():
+    application = create_app(TestConfig)
+    application.config.update(TESTING=False, ENABLE_CSRF=True)
+
+    with application.app_context():
+        db.create_all()
+        user = User(
+            name="Secure Customer",
+            email="secure@example.com",
+            password_hash=generate_password_hash("secure-pass"),
+            phone="5550000111",
+            role="customer",
+        )
+        db.session.add(user)
+        db.session.commit()
+        user_id = user.id
+
+    client = application.test_client()
+    with client.session_transaction() as session:
+        session["_user_id"] = str(user_id)
+        session["_fresh"] = True
+        session["csrf_token"] = "expected-token"
+
+    response = client.post(
+        "/auth/profile",
+        data={
+            "name": "Secure Customer",
+            "email": "secure@example.com",
+            "phone": "5550000111",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 400

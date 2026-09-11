@@ -6,17 +6,32 @@ from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 
-from models import (
-    Inspection,
-    Invoice,
-    Notification,
-    PartUsage,
-    ServiceBooking,
-    ServiceRecord,
-    Vehicle,
-    db,
-)
-from routes.decorators import role_required
+try:
+    from smart_vehicle_service.models import (
+        Inspection,
+        Invoice,
+        Notification,
+        PartUsage,
+        Payment,
+        ServiceBooking,
+        ServiceRecord,
+        Vehicle,
+        db,
+    )
+    from smart_vehicle_service.routes.decorators import role_required
+except ImportError:  # pragma: no cover - local development fallback
+    from models import (
+        Inspection,
+        Invoice,
+        Notification,
+        PartUsage,
+        Payment,
+        ServiceBooking,
+        ServiceRecord,
+        Vehicle,
+        db,
+    )
+    from routes.decorators import role_required
 
 
 customer_bp = Blueprint("customer", __name__)
@@ -347,12 +362,80 @@ def customer_invoice_detail(invoice_id):
     service_record = ServiceRecord.query.filter_by(booking_id=invoice.booking_id).order_by(
         ServiceRecord.created_at.desc()
     ).first()
+    payment_history = (
+        Payment.query.filter_by(invoice_id=invoice.id)
+        .order_by(Payment.payment_date.desc(), Payment.created_at.desc())
+        .all()
+    )
+    latest_payment = payment_history[0] if payment_history else None
+    payment_status = (latest_payment.status if latest_payment else "pending").title()
     return render_template(
         "customer/invoice_detail.html",
         page_title=f"Invoice {invoice.invoice_number}",
         invoice=invoice,
         service_record=service_record,
+        payment_history=payment_history,
+        latest_payment=latest_payment,
+        payment_status=payment_status,
     )
+
+
+@customer_bp.post("/customer/invoices/<int:invoice_id>/payment")
+@role_required("customer")
+def submit_invoice_payment(invoice_id):
+    invoice = (
+        Invoice.query.filter_by(id=invoice_id, customer_id=current_user.id)
+        .first_or_404()
+    )
+    status = (request.form.get("status") or "").strip().lower()
+    payment_method = (request.form.get("payment_method") or "internal_mock").strip().lower()
+    allowed_statuses = {"pending", "paid", "failed", "cancelled"}
+
+    if payment_method != "internal_mock":
+        flash("Only safe internal mock payments are supported in this version.", "error")
+        return redirect(url_for("customer.customer_invoice_detail", invoice_id=invoice.id))
+    if status not in allowed_statuses:
+        flash("Please choose a valid payment status.", "error")
+        return redirect(url_for("customer.customer_invoice_detail", invoice_id=invoice.id))
+
+    payment = Payment(
+        invoice=invoice,
+        customer=current_user,
+        payment_reference=f"PMT-{invoice.id}-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+        transaction_id=f"TXN-{invoice.id}-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+        amount=invoice.total,
+        status=status,
+        payment_method=payment_method,
+        payment_date=datetime.utcnow(),
+        notes="Internal mock payment workflow only. No card credentials stored.",
+    )
+    db.session.add(payment)
+
+    if status == "paid":
+        invoice.status = "paid"
+        invoice.paid_at = datetime.utcnow()
+        if not Payment.query.filter_by(invoice_id=invoice.id, status="paid").count() > 1:
+            notification = Notification(
+                user=current_user,
+                invoice=invoice,
+                title="Payment received",
+                message=f"Your payment for {invoice.invoice_number} was received successfully.",
+                notification_type="payment_received",
+            )
+            db.session.add(notification)
+        flash("Payment processed successfully.", "success")
+    elif status == "failed":
+        invoice.status = "pending"
+        flash("Payment failed. The invoice remains pending.", "error")
+    elif status == "cancelled":
+        invoice.status = "cancelled"
+        flash("Payment cancelled.", "warning")
+    else:
+        invoice.status = "pending"
+        flash("Payment status recorded as pending.", "info")
+
+    db.session.commit()
+    return redirect(url_for("customer.customer_invoice_detail", invoice_id=invoice.id))
 
 
 @customer_bp.post("/customer/notifications/<int:notification_id>/read")

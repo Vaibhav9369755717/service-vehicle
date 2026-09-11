@@ -1,0 +1,199 @@
+{% extends "admin/base.html" %}
+{% set active_page = "reports" %}
+{% block content %}
+<main class="admin-main admin-reports-main">
+    <section class="admin-heading">
+        <div>
+            <p class="eyebrow">Operational insights</p>
+            <h1>Admin reports</h1>
+            <p>Track business performance across revenue, bookings, service activity, inventory and payments.</p>
+        </div>
+        <span class="admin-date">{{ report_range_label }}</span>
+    </section>
+
+    <section class="reports-filter-card">
+        <form method="get" action="{{ url_for('dashboard.admin_reports') }}" class="admin-report-filters">
+            <label>
+                <span>Range</span>
+                <select name="range">
+                    <option value="today" {% if selected_range == 'today' %}selected{% endif %}>Today</option>
+                    <option value="this_week" {% if selected_range == 'this_week' %}selected{% endif %}>This week</option>
+                    <option value="this_month" {% if selected_range == 'this_month' %}selected{% endif %}>This month</option>
+                    <option value="this_year" {% if selected_range == 'this_year' %}selected{% endif %}>This year</option>
+                    <option value="custom" {% if selected_range == 'custom' %}selected{% endif %}>Custom range</option>
+                </select>
+            </label>
+            <label>
+                <span>Start date</span>
+                <input type="date" name="start_date" value="{{ start_date }}">
+            </label>
+            <label>
+                <span>End date</span>
+                <input type="date" name="end_date" value="{{ end_date }}">
+            </label>
+            <button type="submit" class="button button-primary">Apply filters</button>
+        </form>
+    </section>
+
+    <section class="admin-stat-grid report-summary-grid">
+        {% for item in report_summary %}
+        <article>
+            <span>{{ item.label }}</span>
+            <strong>{{ item.value }}</strong>
+            <small>{{ item.note }}</small>
+        </article>
+        {% endfor %}
+    </section>
+
+    <section class="admin-chart-grid">
+        <article class="admin-panel admin-chart-panel">
+            <div class="admin-panel-heading">
+                <div>
+                    <p class="card-kicker">Demand</p>
+                    <h2>Booking trends</h2>
+                </div>
+                <span>{{ report_range_label }}</span>
+            </div>
+            <div class="admin-bar-chart monthly-chart">
+                {% for item in booking_trend %}
+                <div class="admin-bar-column">
+                    <div class="admin-bar-value" style="height: {{ ((item.value / booking_trend_max) * 100)|round(0) if booking_trend_max else 0 }}%" title="{{ item.value }} bookings"></div>
+                    <small>{{ item.label }}</small>
+                </div>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="admin-panel admin-chart-panel">
+            <div class="admin-panel-heading">
+                <div>
+                    <p class="card-kicker">Revenue</p>
+                    <h2>Total revenue</h2>
+                </div>
+                <span>Paid invoices</span>
+            </div>
+            <div class="admin-metric-card">
+                <strong>{{ report_summary[0].value }}</strong>
+                <p>Collected from customer payments in the selected date range.</p>
+            </div>
+        </article>
+    </section>
+
+    <section class="admin-chart-grid">
+        <article class="admin-panel">
+            <div class="admin-panel-heading">
+                <div>
+                    <p class="card-kicker">Service mix</p>
+                    <h2>Most common services</h2>
+                </div>
+            </div>
+            {% if top_services %}
+            <div class="admin-progress-list">
+                {% for item in top_services %}
+                <div>
+                    <span><strong>{{ item.label }}</strong><small>{{ item.value }} bookings</small></span>
+                    <div class="admin-progress-track"><i style="width: {{ ((item.value / top_services[0].value) * 100)|round(0) if top_services[0].value else 0 }}%"></i></div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="admin-empty">No service activity in this range.</div>
+            {% endif %}
+        </article>
+
+        <article class="admin-panel">
+            <div class="admin-panel-heading">
+                <div>
+                    <p class="card-kicker">Customers</p>
+                    <h2>Customer growth</h2>
+                </div>
+            </div>
+            {% if customer_growth %}
+            <div class="admin-mini-table">
+                {% for item in customer_growth %}
+                <div><span>{{ item.label }}</span><strong>{{ item.value }}</strong></div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="admin-empty">No customer growth data.</div>
+            {% endif %}
+        </article>
+    </section>
+
+    <section class="admin-chart-grid">
+        <article class="admin-panel">
+            <div class="admin-panel-heading">
+                <div>
+                    <p class="card-kicker">Workshop</p>
+                    <h2>Mechanic workload</h2>
+                </div>
+            </div>
+            {% if mechanic_workload %}
+            <div class="admin-mini-table compact">
+                {% for item in mechanic_workload %}
+                <div><span>{{ item.label }}</span><strong>{{ item.value }}</strong></div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="admin-empty">No assigned jobs in this range.</div>
+            {% endif %}
+        </article>
+
+        <article class="admin-panel">
+            <div class="admin-panel-heading">
+                <div>
+                    <p class="card-kicker">Stock</p>
+                    <h2>Inventory usage</h2>
+                </div>
+            </div>
+            {% if inventory_usage %}
+            <div class="admin-mini-table compact">
+                {% for item in inventory_usage %}
+                <div><span>{{ item.label }}</span><strong>{{ item.value|int if item.value is number else item.value }}</strong></div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="admin-empty">No inventory usage recorded.</div>
+            {% endif %}
+        </article>
+    </section>
+
+    <section class="admin-chart-grid">
+        <article class="admin-panel">
+            <div class="admin-panel-heading">
+                <div>
+                    <p class="card-kicker">Payments</p>
+                    <h2>Payment methods</h2>
+                </div>
+            </div>
+            {% if payment_summary %}
+            <div class="admin-mini-table compact">
+                {% for item in payment_summary %}
+                <div><span>{{ item.label }}</span><strong>{{ item.count }} / {{ '%.2f'|format(item.value) }}</strong></div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="admin-empty">No payment data for this period.</div>
+            {% endif %}
+        </article>
+
+        <article class="admin-panel">
+            <div class="admin-panel-heading">
+                <div>
+                    <p class="card-kicker">Services</p>
+                    <h2>Recorded services</h2>
+                </div>
+            </div>
+            {% if service_summary %}
+            <div class="admin-mini-table compact">
+                {% for item in service_summary %}
+                <div><span>{{ item.label }}</span><strong>{{ item.value }}</strong></div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="admin-empty">No services available for this window.</div>
+            {% endif %}
+        </article>
+    </section>
+</main>
+{% endblock %}

@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ page_title }} | Smart Vehicle Service</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,10 +28,24 @@
             <div class="mechanic-sidebar-footer"><form method="post" action="{{ url_for('auth.logout') }}"><button class="mechanic-nav-link" type="submit"><span aria-hidden="true">&#8594;</span>Log out</button></form></div>
         </aside>
         <div class="mechanic-content">
-            <header class="mechanic-topbar"><button class="mechanic-toggle" type="button" data-mechanic-toggle aria-label="Open navigation" aria-expanded="false"><span></span><span></span><span></span></button><div><span class="mechanic-kicker">Workshop workspace</span><h1>{{ page_title }}</h1></div><div class="mechanic-user"><span class="mechanic-avatar">{{ current_user.name[:1]|upper }}</span><span>{{ current_user.name }}</span></div></header>
+            <header class="mechanic-topbar"><button class="mechanic-toggle" type="button" data-mechanic-toggle aria-label="Open navigation" aria-expanded="false"><span></span><span></span><span></span></button><div><span class="mechanic-kicker">Workshop workspace</span><h1>{{ page_title }}</h1></div><div class="mechanic-user"><a href="{{ url_for('auth.profile') }}" class="mechanic-user-link"><span class="mechanic-avatar">{{ current_user.name[:1]|upper }}</span><span>{{ current_user.name }}</span></a></div></header>
             <main class="mechanic-main">{% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<div class="mechanic-flashes">{% for category, message in messages %}<div class="flash flash-{{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}{% block content %}{% endblock %}</main>
         </div>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = document.querySelector('meta[name="csrf-token"]')?.content;
+            if (!token) return;
+            document.querySelectorAll('form[method="post"]').forEach((form) => {
+                if (form.querySelector('input[name="csrf_token"]')) return;
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'csrf_token';
+                input.value = token;
+                form.appendChild(input);
+            });
+        });
+    </script>
     <script src="{{ url_for('static', filename='js/mechanic.js') }}"></script>
 </body>
 </html>

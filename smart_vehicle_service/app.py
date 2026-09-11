@@ -1,28 +1,90 @@
-from flask import Flask, render_template
+import hmac
+import logging
+import os
+import secrets
+
+from dotenv import load_dotenv
+from flask import Flask, abort, render_template, request, session
 from flask_login import current_user
 from sqlalchemy import inspect, text
 
-from auth import login_manager
-from config import Config
-from models import Notification, db
-from routes import register_blueprints
+try:
+    from smart_vehicle_service.auth import login_manager
+    from smart_vehicle_service.config import Config, ProductionConfig
+    from smart_vehicle_service.models import Notification, db
+    from smart_vehicle_service.routes import register_blueprints
+except ImportError:  # pragma: no cover - local development fallback
+    from auth import login_manager
+    from config import Config, ProductionConfig
+    from models import Notification, db
+    from routes import register_blueprints
 
 
-def create_app(config_class=Config):
+load_dotenv()
+
+
+def create_app(config_class=None):
+    if config_class is None:
+        config_class = ProductionConfig if os.environ.get("FLASK_ENV") == "production" else Config
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config_class)
+    if app.config.get("ENV") == "production":
+        ProductionConfig.validate()
+    app.config.setdefault("SESSION_COOKIE_HTTPONLY", True)
+    app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
+    app.config.setdefault("SESSION_COOKIE_SECURE", not app.debug and not app.config.get("TESTING", False))
+    app.config.setdefault("ENABLE_CSRF", not app.config.get("TESTING", False))
+    app.config.setdefault("LOG_LEVEL", "INFO")
+
+    logging.basicConfig(
+        level=getattr(logging, str(app.config.get("LOG_LEVEL", "INFO")).upper(), logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    app.logger.setLevel(getattr(logging, str(app.config.get("LOG_LEVEL", "INFO")).upper(), logging.INFO))
+
     db.init_app(app)
     login_manager.init_app(app)
     register_blueprints(app)
 
+    def generate_csrf_token():
+        if "csrf_token" not in session:
+            session["csrf_token"] = secrets.token_urlsafe(32)
+        return session["csrf_token"]
+
     @app.context_processor
-    def customer_notification_count():
+    def inject_security_context():
         unread_count = 0
         if current_user.is_authenticated and current_user.role == "customer":
             unread_count = Notification.query.filter_by(
                 user_id=current_user.id, is_read=False
             ).count()
-        return {"unread_notification_count": unread_count}
+        return {
+            "unread_notification_count": unread_count,
+            "csrf_token": generate_csrf_token,
+        }
+
+    @app.before_request
+    def enforce_csrf():
+        if app.config.get("TESTING"):
+            return None
+        if not app.config.get("ENABLE_CSRF"):
+            return None
+        if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
+            return None
+        if request.endpoint and request.endpoint.startswith("static"):
+            return None
+        expected = session.get("csrf_token")
+        submitted = request.form.get("csrf_token") or request.headers.get("X-CSRFToken")
+        if not expected or not submitted or not hmac.compare_digest(expected, submitted):
+            abort(400, description="Invalid or missing CSRF token.")
+
+    @app.after_request
+    def apply_security_headers(response):
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        return response
 
     @app.route("/")
     def home():
@@ -31,6 +93,15 @@ def create_app(config_class=Config):
     @app.errorhandler(403)
     def forbidden(error):
         return render_template("errors/403.html", page_title="Access denied"), 403
+
+    @app.errorhandler(400)
+    def bad_request(error):
+        return render_template("errors/403.html", page_title="Bad request"), 400
+
+    @app.errorhandler(500)
+    def internal_server_error(error):
+        app.logger.exception("Unhandled server error: %s", error)
+        return render_template("errors/403.html", page_title="Server error"), 500
 
     @app.cli.command("init-db")
     def init_db_command():
@@ -61,6 +132,17 @@ def add_missing_columns():
             "booking_id": "INTEGER",
             "invoice_id": "INTEGER",
         },
+        "payments": {
+            "invoice_id": "INTEGER NOT NULL",
+            "customer_id": "INTEGER NOT NULL",
+            "payment_reference": "VARCHAR(80) NOT NULL",
+            "transaction_id": "VARCHAR(80) NOT NULL",
+            "amount": "NUMERIC(12, 2) NOT NULL DEFAULT 0",
+            "status": "VARCHAR(30) NOT NULL DEFAULT 'pending'",
+            "payment_method": "VARCHAR(50) NOT NULL DEFAULT 'internal_mock'",
+            "payment_date": "DATETIME",
+            "notes": "TEXT",
+        },
         "users": {"specialization": "VARCHAR(120)"},
         "service_records": {
             "customer_id": "INTEGER",
@@ -89,4 +171,4 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8000")), debug=False)

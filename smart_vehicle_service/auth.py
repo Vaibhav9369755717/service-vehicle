@@ -1,6 +1,9 @@
 from flask_login import LoginManager
 
-from models import User, db
+try:
+    from smart_vehicle_service.models import User, db
+except ImportError:  # pragma: no cover - local development fallback
+    from models import User, db
 
 
 login_manager = LoginManager()
