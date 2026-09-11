@@ -1,10 +1,9 @@
-import hmac
 import logging
 import os
-import secrets
+
 
 from dotenv import load_dotenv
-from flask import Flask, abort, render_template, request, session
+from flask import Flask, abort, render_template, request
 from flask_login import current_user
 from sqlalchemy import inspect, text
 
@@ -46,37 +45,19 @@ def create_app(config_class=None):
     login_manager.init_app(app)
     register_blueprints(app)
 
-    def generate_csrf_token():
-        if "csrf_token" not in session:
-            session["csrf_token"] = secrets.token_urlsafe(32)
-        return session["csrf_token"]
-
     @app.context_processor
     def inject_security_context():
         unread_count = 0
+
         if current_user.is_authenticated and current_user.role == "customer":
             unread_count = Notification.query.filter_by(
-                user_id=current_user.id, is_read=False
+                user_id=current_user.id,
+                is_read=False
             ).count()
+
         return {
             "unread_notification_count": unread_count,
-            "csrf_token": generate_csrf_token,
         }
-
-    @app.before_request
-    def enforce_csrf():
-        if app.config.get("TESTING"):
-            return None
-        if not app.config.get("ENABLE_CSRF"):
-            return None
-        if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
-            return None
-        if request.endpoint and request.endpoint.startswith("static"):
-            return None
-        expected = session.get("csrf_token")
-        submitted = request.form.get("csrf_token") or request.headers.get("X-CSRFToken")
-        if not expected or not submitted or not hmac.compare_digest(expected, submitted):
-            abort(400, description="Invalid or missing CSRF token.")
 
     @app.after_request
     def apply_security_headers(response):
@@ -85,6 +66,7 @@ def create_app(config_class=None):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
         return response
+
 
     @app.route("/")
     def home():
