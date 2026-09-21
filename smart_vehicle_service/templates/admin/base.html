@@ -1,13 +1,44 @@
 <!doctype html>
 <html lang="en">
+
 <head>
-    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ page_title }} | Smart Vehicle Service</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
 </head>
-<body class="admin-page"><div class="admin-app"><aside class="admin-sidebar"><a class="brand" href="{{ url_for('home') }}"><span class="brand-mark" aria-hidden="true">SV</span><span class="brand-name">Smart<span>Vehicle</span></span></a><p class="admin-label">Administration</p><nav class="admin-nav"><a class="admin-nav-link {% if active_page == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard.admin_dashboard') }}">Dashboard</a><a class="admin-nav-link {% if active_page == 'bookings' %}active{% endif %}" href="{{ url_for('dashboard.admin_bookings') }}">Bookings</a><a class="admin-nav-link {% if active_page == 'service-records' %}active{% endif %}" href="{{ url_for('dashboard.admin_service_records') }}">Service Records</a><a class="admin-nav-link {% if active_page == 'inventory' %}active{% endif %}" href="{{ url_for('dashboard.admin_inventory') }}">Inventory</a><a class="admin-nav-link {% if active_page == 'reports' %}active{% endif %}" href="{{ url_for('dashboard.admin_reports') }}">Reports</a><a class="admin-nav-link" href="{{ url_for('dashboard.admin_customers') }}">Customers</a><a class="admin-nav-link" href="{{ url_for('dashboard.admin_vehicles') }}">Vehicles</a></nav><form class="admin-logout" method="post" action="{{ url_for('auth.logout') }}"><button class="admin-nav-link" type="submit">Log out</button></form></aside><main class="admin-content"><header class="admin-topbar"><span>Administration workspace</span><a href="{{ url_for('auth.profile') }}" style="color: var(--navy); font-weight: 600;">{{ current_user.name }}</a></header>{% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<div class="admin-flashes">{% for category, message in messages %}<div class="flash flash-{{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}{% block content %}{% endblock %}</main></div>
+
+<body class="admin-page">
+    <div class="admin-app">
+        <aside class="admin-sidebar"><a class="brand" href="{{ url_for('home') }}"><span class="brand-mark"
+                    aria-hidden="true">SV</span><span class="brand-name">Smart<span>Vehicle</span></span></a>
+            <p class="admin-label">Administration</p>
+            <nav class="admin-nav"><a class="admin-nav-link {% if active_page == 'dashboard' %}active{% endif %}"
+                    href="{{ url_for('dashboard.admin_dashboard') }}">Dashboard</a><a
+                    class="admin-nav-link {% if active_page == 'bookings' %}active{% endif %}"
+                    href="{{ url_for('dashboard.admin_bookings') }}">Bookings</a><a
+                    class="admin-nav-link {% if active_page == 'service-records' %}active{% endif %}"
+                    href="{{ url_for('dashboard.admin_service_records') }}">Service Records</a><a
+                    class="admin-nav-link {% if active_page == 'inventory' %}active{% endif %}"
+                    href="{{ url_for('dashboard.admin_inventory') }}">Inventory</a><a
+                    class="admin-nav-link {% if active_page == 'reports' %}active{% endif %}"
+                    href="{{ url_for('dashboard.admin_reports') }}">Reports</a><a class="admin-nav-link"
+                    href="{{ url_for('dashboard.admin_customers') }}">Customers</a><a class="admin-nav-link"
+                    href="{{ url_for('dashboard.admin_vehicles') }}">Vehicles</a></nav>
+            <form class="admin-logout" method="post" action="{{ url_for('auth.logout') }}"><button
+                    class="admin-nav-link" type="submit">Log out</button></form>
+        </aside>
+        <main class="admin-content">
+            <header class="admin-topbar"><span>Administration workspace</span><a href="{{ url_for('auth.profile') }}"
+                    style="color: var(--navy); font-weight: 600;">{{ current_user.name }}</a></header>{% with messages =
+            get_flashed_messages(with_categories=true) %}{% if messages %}<div class="admin-flashes">{% for category,
+                message in messages %}<div class="flash flash-{{ category }}">{{ message }}</div>{% endfor %}</div>{%
+            endif %}{% endwith %}{% block content %}{% endblock %}
+        </main>
+    </div>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const token = document.querySelector('meta[name="csrf-token"]')?.content;
@@ -23,4 +54,5 @@
         });
     </script>
 </body>
+
 </html>

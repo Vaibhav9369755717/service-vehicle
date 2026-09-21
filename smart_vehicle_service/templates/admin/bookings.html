@@ -1,5 +1,41 @@
 {% extends "admin/base.html" %}
 {% set active_page = "bookings" %}
 {% block content %}
-<main class="admin-main"><section class="admin-heading"><div><p class="eyebrow">Service operations</p><h1>Booking management</h1><p>Review requests, coordinate mechanics and keep customers informed.</p></div></section><section class="booking-admin-filters"><form method="get" action="{{ url_for('dashboard.admin_bookings') }}"><input name="q" value="{{ filters.q }}" placeholder="Search customer, vehicle or service" aria-label="Search bookings"><select name="status" aria-label="Filter by status"><option value="">All statuses</option>{% for value in statuses %}<option value="{{ value }}" {% if filters.status|lower == value|lower %}selected{% endif %}>{{ value }}</option>{% endfor %}</select><select name="service_type" aria-label="Filter by service type"><option value="">All service types</option>{% for value in service_types %}<option value="{{ value }}" {% if filters.service_type == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select><input name="date" type="date" value="{{ filters.date }}" aria-label="Filter by booking date"><button class="button button-secondary" type="submit">Filter</button>{% if filters.q or filters.status or filters.service_type or filters.date %}<a class="text-link" href="{{ url_for('dashboard.admin_bookings') }}">Clear</a>{% endif %}</form></section>{% if bookings %}<section class="booking-admin-table"><div class="booking-admin-head"><span>Booking</span><span>Customer</span><span>Vehicle</span><span>Date &amp; time</span><span>Status</span><span></span></div>{% for booking in bookings %}<a class="booking-admin-row" href="{{ url_for('dashboard.admin_booking_detail', booking_id=booking.id) }}"><span><strong>#{{ "%04d"|format(booking.id) }}</strong><small>{{ booking.service_type }}</small></span><span>{{ booking.customer.name }}<small>{{ booking.customer.email }}</small></span><span>{{ booking.vehicle.manufacturer }} {{ booking.vehicle.model }}<small>{{ booking.vehicle.registration_number }}</small></span><span>{{ booking.booking_date.strftime('%d %b %Y') }}<small>{{ booking.booking_time.strftime('%H:%M') }}</small></span><span class="status-badge status-{{ booking.status|lower|replace(' ', '-') }}">{{ booking.status|replace('_', ' ')|title }}</span><span class="row-arrow" aria-hidden="true">&#8594;</span></a>{% endfor %}</section>{% else %}<section class="admin-empty admin-empty-large"><strong>No bookings found.</strong><p>Try clearing the filters or wait for a new customer request.</p></section>{% endif %}</main>
+<main class="admin-main">
+    <section class="admin-heading">
+        <div>
+            <p class="eyebrow">Service operations</p>
+            <h1>Booking management</h1>
+            <p>Review requests, coordinate mechanics and keep customers informed.</p>
+        </div>
+    </section>
+    <section class="booking-admin-filters">
+        <form method="get" action="{{ url_for('dashboard.admin_bookings') }}"><input name="q" value="{{ filters.q }}"
+                placeholder="Search customer, vehicle or service" aria-label="Search bookings"><select name="status"
+                aria-label="Filter by status">
+                <option value="">All statuses</option>{% for value in statuses %}<option value="{{ value }}" {% if
+                    filters.status|lower==value|lower %}selected{% endif %}>{{ value }}</option>{% endfor %}
+            </select><select name="service_type" aria-label="Filter by service type">
+                <option value="">All service types</option>{% for value in service_types %}<option value="{{ value }}"
+                    {% if filters.service_type==value %}selected{% endif %}>{{ value }}</option>{% endfor %}
+            </select><input name="date" type="date" value="{{ filters.date }}"
+                aria-label="Filter by booking date"><button class="button button-secondary"
+                type="submit">Filter</button>{% if filters.q or filters.status or filters.service_type or filters.date
+            %}<a class="text-link" href="{{ url_for('dashboard.admin_bookings') }}">Clear</a>{% endif %}</form>
+    </section>{% if bookings %}<section class="booking-admin-table">
+        <div class="booking-admin-head"><span>Booking</span><span>Customer</span><span>Vehicle</span><span>Date &amp;
+                time</span><span>Status</span><span></span></div>{% for booking in bookings %}<a
+            class="booking-admin-row"
+            href="{{ url_for('dashboard.admin_booking_detail', booking_id=booking.id) }}"><span><strong>#{{
+                    "%04d"|format(booking.id) }}</strong><small>{{ booking.service_type }}</small></span><span>{{
+                booking.customer.name }}<small>{{ booking.customer.email }}</small></span><span>{{
+                booking.vehicle.manufacturer }} {{ booking.vehicle.model }}<small>{{ booking.vehicle.registration_number
+                    }}</small></span><span>{{ booking.booking_date.strftime('%d %b %Y') }}<small>{{
+                    booking.booking_time.strftime('%H:%M') }}</small></span><span
+                class="status-badge status-{{ booking.status|lower|replace(' ', '-') }}">{{ booking.status|replace('_',
+                ' ')|title }}</span><span class="row-arrow" aria-hidden="true">&#8594;</span></a>{% endfor %}
+    </section>{% else %}<section class="admin-empty admin-empty-large"><strong>No bookings found.</strong>
+        <p>Try clearing the filters or wait for a new customer request.</p>
+    </section>{% endif %}
+</main>
 {% endblock %}
