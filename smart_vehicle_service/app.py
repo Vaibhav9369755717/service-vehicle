@@ -3,8 +3,8 @@ import os
 
 
 from dotenv import load_dotenv
-from flask import Flask, abort, render_template, request
-from flask_login import current_user
+from flask import Flask, abort, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
 from sqlalchemy import inspect, text
 
 try:
@@ -72,9 +72,24 @@ def create_app(config_class=None):
     def home():
         return render_template("base.html", page_title="Smart Vehicle Service")
 
+    @app.route("/dashboard")
+    @login_required
+    def dashboard_redirect():
+        dashboard_endpoints = {
+            "customer": "customer.customer_dashboard",
+            "mechanic": "dashboard.mechanic_dashboard",
+            "admin": "dashboard.admin_dashboard",
+        }
+        endpoint = dashboard_endpoints.get(current_user.role, "home")
+        return redirect(url_for(endpoint))
+
     @app.errorhandler(403)
     def forbidden(error):
-        return render_template("errors/403.html", page_title="Access denied"), 403
+        return render_template(
+            "errors/403.html",
+            page_title="Access denied",
+            dashboard_endpoint=("dashboard_redirect" if current_user.is_authenticated else "auth.login"),
+        ), 403
 
     @app.errorhandler(400)
     def bad_request(error):
