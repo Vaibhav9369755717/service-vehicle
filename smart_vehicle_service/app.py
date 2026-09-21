@@ -2,20 +2,23 @@ import logging
 import os
 
 
+import click
 from dotenv import load_dotenv
 from flask import Flask, abort, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import inspect, text
+from sqlalchemy.exc import IntegrityError
+from werkzeug.security import generate_password_hash
 
 try:
     from smart_vehicle_service.auth import login_manager
     from smart_vehicle_service.config import Config, ProductionConfig
-    from smart_vehicle_service.models import Notification, db
+    from smart_vehicle_service.models import Notification, User, db
     from smart_vehicle_service.routes import register_blueprints
 except ImportError:  # pragma: no cover - local development fallback
     from auth import login_manager
     from config import Config, ProductionConfig
-    from models import Notification, db
+    from models import Notification, User, db
     from routes import register_blueprints
 
 
@@ -105,6 +108,36 @@ def create_app(config_class=None):
         """Create all database tables."""
         init_database(app)
         print("Initialized the database.")
+
+    @app.cli.command("create-user")
+    @click.option("--name", prompt="Full name")
+    @click.option("--email", prompt="Email address")
+    @click.option(
+        "--role",
+        type=click.Choice(("admin", "customer", "mechanic"), case_sensitive=False),
+        prompt="Role",
+    )
+    @click.option("--password", prompt=True, hide_input=True, confirmation_prompt=True)
+    def create_user_command(name, email, role, password):
+        """Create a login account for an admin, customer, or mechanic."""
+        init_database(app)
+        normalized_email = email.strip().lower()
+        if User.query.filter_by(email=normalized_email).first():
+            raise click.ClickException("An account with that email already exists.")
+
+        user = User(
+            name=name.strip(),
+            email=normalized_email,
+            password_hash=generate_password_hash(password),
+            role=role.lower(),
+        )
+        db.session.add(user)
+        try:
+            db.session.commit()
+        except IntegrityError as error:
+            db.session.rollback()
+            raise click.ClickException("Could not create the account.") from error
+        click.echo(f"Created {user.role} account for {user.email}.")
 
     return app
 
